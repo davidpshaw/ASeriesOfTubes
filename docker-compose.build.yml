@@ -1,0 +1,6 @@
+# Override for building from source in a clone of this repo:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+services:
+  aseriesoftubes:
+    build: .
+    image: aseriesoftubes:local

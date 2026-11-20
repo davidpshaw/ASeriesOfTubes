@@ -1,0 +1,16 @@
+{
+  "name": "aseriesoftubes",
+  "version": "0.1.0",
+  "description": "How the internet actually works, animated one packet at a time.",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "author": "David Shaw",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  }
+}

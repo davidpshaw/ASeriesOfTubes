@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  docker:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: aseriesoftubes:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test container
+        run: |
+          docker run -d --name tubes -p 8080:8080 --read-only --cap-drop ALL aseriesoftubes:ci
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:8080/healthz && break
+            sleep 1
+          done
+          curl -sf http://localhost:8080/ | grep -q 'A Series of Tubes'
+          curl -sf http://localhost:8080/topics.js -o /dev/null
+          curl -sfI http://localhost:8080/ | grep -qi "content-security-policy: default-src 'self'"
+          echo "Smoke test OK"
+
+      - name: Container logs
+        if: always()
+        run: docker logs tubes || true
