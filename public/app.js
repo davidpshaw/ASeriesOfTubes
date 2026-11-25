@@ -36,10 +36,12 @@ const markSeen = (id) => { seen[id] = 1; try { localStorage.setItem('sot-seen', 
 /* ---------- scene geometry and drawing ---------- */
 function geo() {
   const W = svg.clientWidth, H = svg.clientHeight, small = W < 520;
-  const r = small ? 20 : 26, px = Math.min(96, Math.max(54, W * 0.13)), top = r + 30, bot = r + (small ? 96 : 70);
+  // While the "Back out" button shows, keep a strip clear for it across the top of the scene.
+  const inset = trail.length ? (small ? 48 : 60) : 0;
+  const r = small ? 20 : 26, px = Math.min(96, Math.max(54, W * 0.13)), top = r + 30 + inset, bot = r + (small ? 96 : 70);
   const P = {};
   for (const a of cur.actors) P[a.id] = { x: px + (a.x / 100) * (W - 2 * px), y: top + (a.y / 100) * (H - top - bot) };
-  return { W, H, r, small, P };
+  return { W, H, r, small, P, inset };
 }
 const idx = (id) => cur.actors.findIndex((a) => a.id === id);
 function seg(m, g, lane = 0) {
@@ -154,7 +156,7 @@ function browserPage(g, at, stage, warn) {
   let x = Math.max(at.x + g.r + 28, g.W / 2 - w / 2 + 20);
   x = Math.min(x, g.W - w - 10);
   if (x < 10) x = 10;
-  const y = Math.max(12, Math.min(g.H - hh - 40, at.y - hh * 0.62));
+  const y = Math.max(12 + g.inset, Math.min(g.H - hh - 40, at.y - hh * 0.62));
   const bar = 26, ix = x + 12, iw = w - 24, top = y + bar + 10;
   const styled = stage >= 2;
   let h = `<g class="page">`;
@@ -217,8 +219,8 @@ function chainState(c, pos) {
 }
 function chainPanel(g, c, s) {
   const n = c.cards.length, w = g.small ? g.W - 24 : Math.min(360, g.W * 0.5), x = g.small ? 12 : 16;
-  const row = g.small ? 20 : 23, gap = g.small ? 24 : 30, head = g.small ? 30 : 34, cardH = (k) => head + c.cards[k].checks.length * row + 6;
-  let y = 14, h = '<g class="chain">';
+  const row = g.small ? 20 : 23, gap = g.small ? 20 : 30, head = g.small ? 30 : 34, cardH = (k) => head + c.cards[k].checks.length * row + 6;
+  let y = 14 + g.inset, h = '<g class="chain">';
   const tops = [];
   for (let k = n - 1; k >= 0; k--) { tops[k] = y; y += cardH(k) + gap; }
   for (let k = n - 1; k >= 0; k--) {
@@ -377,7 +379,11 @@ function renderTrail() {
     + `<span class="here" aria-current="location">${esc(cur.title)}</span>`;
   const p = trail.at(-1);
   backBtn.hidden = !p;
-  if (p) { backBtn.textContent = `↑ Back out to ${nameOf(p.id)}`; backBtn.dataset.back = trail.length - 1; }
+  if (p) {
+    backBtn.innerHTML = `↑ Back out<span class="bo-to"> to ${esc(nameOf(p.id))}</span>`;
+    backBtn.setAttribute('aria-label', `Back out to ${nameOf(p.id)}`);
+    backBtn.dataset.back = trail.length - 1;
+  }
 }
 function renderMenu() {
   $('#menuList').innerHTML = GROUPS.map(([g, ids]) => `<h3>${esc(g)}</h3>` + ids.map((id) =>
