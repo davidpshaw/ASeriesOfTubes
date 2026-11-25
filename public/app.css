@@ -82,11 +82,12 @@ h1{font-size:clamp(32px,4vw,46px);line-height:1.05;margin:6px 0 12px;text-wrap:b
 .backout{position:absolute;left:12px;top:12px;z-index:3;min-height:44px;padding:0 14px;border-radius:999px;border:1.5px solid var(--ink);background:var(--panel);font-weight:700;cursor:pointer}
 .backout:hover{background:var(--tint)}
 .pop{position:absolute;z-index:4;width:min(340px,calc(100% - 24px));background:var(--panel);border:1.5px solid var(--ink);border-radius:12px;padding:12px 14px;box-shadow:0 14px 34px rgb(0 0 0/.22);font-size:14px}
-.pop .ph{font-weight:800;font-size:15px;margin:0 0 2px}
+.pop .ph{font-weight:800;font-size:15px;margin:0 0 2px;padding-right:40px}
 .pop .pd{color:var(--mute);margin:0 0 6px}
 .pop pre{margin:0 0 8px;padding:8px 10px;background:var(--bg);border-radius:8px;font:12px/1.5 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}
 .pop pre.gib{color:var(--mute)}
-.pop .x{position:absolute;right:6px;top:6px;width:36px;height:36px;border:0;background:none;font-size:20px;cursor:pointer;color:var(--mute)}
+.pop .x{position:absolute;right:8px;top:8px;width:32px;height:32px;padding:0;border:1.5px solid var(--ink);border-radius:50%;background:var(--bg);color:var(--ink);font-size:20px;line-height:1;cursor:pointer;display:grid;place-content:center}
+.pop .x:hover{background:var(--ink);color:var(--panel)}
 
 /* scene drawing */
 .lnk{stroke:var(--line);stroke-width:1.5;stroke-dasharray:3 5}
@@ -130,7 +131,7 @@ h1{font-size:clamp(32px,4vw,46px);line-height:1.05;margin:6px 0 12px;text-wrap:b
 .potlock circle{fill:var(--ink);stroke:none}.potlock rect{fill:var(--panel)}.potlock path{fill:none;stroke:var(--panel);stroke-width:1.3}
 .ghost{stroke:var(--ink);stroke-width:1.4}
 .chip .swatch{stroke:var(--ink);stroke-width:1.3}.chip.ke .swatch{stroke:var(--panel)}
-.hint{pointer-events:none}.hint rect,.hint path{fill:var(--brick)}.hint text{font:700 13px var(--sans);fill:#fff;text-anchor:middle}
+.hint{pointer-events:none}.hint .ht{font-size:12px}.hint rect,.hint path{fill:var(--brick)}.hint text{font:700 13px var(--sans);fill:#fff;text-anchor:middle}
 .chip .ring{fill:none;stroke:var(--brick);stroke-width:2.5;transform-box:fill-box;transform-origin:center;animation:ripple 1s ease-out 1 both}
 @keyframes ripple{from{opacity:.9;transform:scale(1)}to{opacity:0;transform:scale(1.35)}}
 .peek-hint{margin-top:12px!important;font-size:14px;color:var(--mute);display:flex;gap:8px;align-items:baseline}
@@ -173,7 +174,7 @@ footer{font-size:13px;color:var(--mute);padding:24px max(3vw,16px) 36px;max-widt
 
 @media(max-width:899px){
  .story{grid-template-columns:minmax(0,1fr);grid-template-areas:"scene" "cap";padding:0}
- .scene-wrap{top:var(--hh,60px);height:48vh;min-height:300px;margin:0;border-radius:0;border-width:0 0 1px;z-index:2}
+ .scene-wrap{top:var(--hh,60px);height:42vh;height:42svh;min-height:270px;margin:0;border-radius:0;border-width:0 0 1px;z-index:2}
  .captions{padding:12px 16px 40vh}
  .card{margin-bottom:40vh}
  .card.intro{margin-top:8px}

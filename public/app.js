@@ -49,7 +49,7 @@ function geo() {
   const W = svg.clientWidth, H = svg.clientHeight, small = W < 520;
   // While the "Back out" button shows, keep a strip clear for it across the top of the scene.
   const inset = trail.length ? (small ? 48 : 60) : 0;
-  const r = small ? 20 : 26, px = Math.min(96, Math.max(54, W * 0.13)), top = r + 30 + inset, bot = r + (small ? 96 : 70);
+  const r = small ? 18 : 26, px = Math.min(96, Math.max(54, W * 0.13)), top = r + 30 + inset, bot = r + (small ? 82 : 70);
   const P = {};
   for (const a of cur.actors) P[a.id] = { x: px + (a.x / 100) * (W - 2 * px), y: top + (a.y / 100) * (H - top - bot) };
   return { W, H, r, small, P, inset };
@@ -163,13 +163,20 @@ function draw() {
   }
   // Phones: the packet in flight, or the newest one, gets its full label in a strip along the bottom.
   const focus = pkt ? pkt.i : done - 1;
-  if (g.small && ms[focus]) {
+  if (g.small && ms[focus] && !hideScene) {
     const land = !pkt && performance.now() - landedAt < 120 && !RM.matches;
     h += chip(g.W / 2, g.H - 26, ms[focus], focus, g.W, { land, num: numbered ? focus + 1 : 0 });
-    if (!pkt) hintAt = { x: g.W / 2, y: g.H - 45 };
+    if (!pkt) {
+      // on phones the hint is a small tag on the strip packet's top corner, so it never covers the scene
+      const m = ms[focus], cw = Math.min(g.W - 8, m[2].length * 8.1 + 24 + (numbered ? 24 : 0) + (m[5] ? 20 : 0) + ((m[3] || 'p') === 'e' ? 8 : 46));
+      hintAt = { tag: true, right: g.W / 2 + cw / 2, top: g.H - 26 - 19 };
+    }
   }
   // Until someone has opened a packet once, point at the newest one.
-  if (!peeked && hintAt && !hideScene) {
+  if (!peeked && hintAt?.tag && !hideScene) {
+    const tw = 124, tx = Math.min(g.W - tw - 4, hintAt.right - tw + 8), ty = hintAt.top - 13;
+    h += `<g class="hint" transform="translate(${tx},${ty})"><rect width="${tw}" height="22" rx="11"/><text x="${tw / 2}" y="15.5" class="ht">Tap to look inside</text></g>`;
+  } else if (!peeked && hintAt && !hideScene) {
     const txt = g.small ? 'Tap to look inside' : 'Click to look inside', bw = txt.length * 7.6 + 24;
     const above = hintAt.y - 10 - 30, flip = above < 6 + g.inset, by = flip ? hintAt.y + 38 + 10 : above;
     const tip = flip ? `<path d="M${bw / 2 - 7} 0.5l7 -8 7 8z"/>` : `<path d="M${bw / 2 - 7} 29.5l7 8 7-8z"/>`;
@@ -283,12 +290,17 @@ function chainState(c, pos) {
   const last = shown.at(-1), who = last ? c.cards[last[0]].checks[last[1]][2] : null;
   const passed = (k) => revealed(k) === c.cards[k].checks.length && !c.cards[k].checks.slice(0, revealed(k)).some((x) => x[1] === false);
   const complete = pos >= list.length;
-  return { from, to, revealed, passed, failed: failedAt >= 0, who, complete, trusted: complete && failedAt < 0 && to === c.cards.length - 1 };
+  // the card in focus: the one whose check comes next, or the last one once everything is shown
+  const focus = complete ? (failedAt >= 0 ? shown[failedAt][0] : to) : list[pos][0];
+  return { from, to, revealed, passed, failed: failedAt >= 0, who, complete, focus, trusted: complete && failedAt < 0 && to === c.cards.length - 1 };
 }
 function chainPanel(g, c, s) {
   const n = c.cards.length, w = g.small ? g.W - 24 : Math.min(360, g.W * 0.5), x = g.small ? 12 : 16;
-  const row = g.small ? 20 : 23, gap = g.small ? 20 : 30, head = g.small ? 30 : 34, cardH = (k) => head + c.cards[k].checks.length * row + 6;
-  let y = 14 + g.inset, h = '<g class="chain">';
+  const row = g.small ? 20 : 23, gap = g.small ? 16 : 30, head = g.small ? 29 : 34;
+  // On phones only the card in focus opens up; the rest collapse to one line with their result.
+  const collapsed = (k) => g.small && k !== s.focus;
+  const cardH = (k) => (collapsed(k) ? head : head + c.cards[k].checks.length * row + 6);
+  let y = 0, h = '';
   const tops = [];
   for (let k = n - 1; k >= 0; k--) { tops[k] = y; y += cardH(k) + gap; }
   for (let k = n - 1; k >= 0; k--) {
@@ -298,7 +310,10 @@ function chainPanel(g, c, s) {
     h += `<rect class="ccard${ok ? ' ok' : ''}${bad ? ' bad' : ''}${current ? ' cur' : ''}" x="${x}" y="${top}" width="${w}" height="${cardH(k)}" rx="8"/>`;
     h += `<g class="ico cico" transform="translate(${x + 10},${top + 7}) scale(.8)">${ICONS.seal}</g>`;
     h += `<text class="cname" x="${x + 36}" y="${top + 22}">${esc(card.name)}</text>`;
-    card.checks.forEach(([text, good = true], j) => {
+    if (collapsed(k)) {
+      if (ok) h += `<g class="ctick" transform="translate(${x + w - 18},${top + 15})"><circle r="8"/><path d="M-3.5 0l2.5 2.6 4.6-5"/></g>`;
+      else if (bad) h += `<g class="ccross" transform="translate(${x + w - 18},${top + 15})"><circle r="8"/><path d="M-3 -3l6 6M3 -3l-6 6"/></g>`;
+    } else card.checks.forEach(([text, good = true], j) => {
       const cy = top + head + j * row + 12, shownNow = j < rev;
       if (shownNow && good) h += `<g class="ctick" transform="translate(${x + 20},${cy - 4})"><circle r="8"/><path d="M-3.5 0l2.5 2.6 4.6-5"/></g>`;
       else if (shownNow) h += `<g class="ccross" transform="translate(${x + 20},${cy - 4})"><circle r="8"/><path d="M-3 -3l6 6M3 -3l-6 6"/></g>`;
@@ -311,10 +326,12 @@ function chainPanel(g, c, s) {
       h += `<g class="clink ${state}"><rect x="${cx - 6}" y="${ly + 2}" width="12" height="16" rx="6"/><rect x="${cx - 6}" y="${ly + 12}" width="12" height="16" rx="6"/></g>`;
     }
   }
-  const foot = y - gap + 22;
+  const foot = y - gap + 22, y0 = 14 + g.inset;
+  // On short scenes (phones) shrink the whole panel so the verdict line still fits.
+  const sc = Math.min(1, (g.H - 8 - y0) / (foot + 6));
   if (s.trusted) h += `<g class="cverdict ok"><text x="${x + 6}" y="${foot}">✓ Every link holds: trusted</text></g>`;
   else if (s.failed && s.complete) h += `<g class="cverdict bad"><text x="${x + 6}" y="${foot}">✗ The chain is broken: not trusted</text></g>`;
-  h += '</g>';
+  h = `<g class="chain" transform="translate(${x * (1 - sc)},${y0}) scale(${sc})">${h}</g>`;
   // padlock on the checking actor once the whole chain is trusted
   const at = g.P[c.at];
   if (at && !g.small && s.trusted) h += `<g class="lockb" transform="translate(${at.x + g.r * 0.8},${at.y - g.r * 0.8})"><circle r="12"/><rect x="-4.5" y="-1" width="9" height="7" rx="1.2"/><path d="M-2.6 -1v-2.2a2.6 2.6 0 0 1 5.2 0V-1"/></g>`;
