@@ -26,7 +26,7 @@ const ICONS = {
   bank: '<path d="M3 9.5 12 4l9 5.5z"/><path d="M5.5 9.5v8.5M10 9.5v8.5M14 9.5v8.5M18.5 9.5v8.5M3 20.5h18"/>',
 };
 
-let cur = null, curId = '', active = -2, step = -1, done = 0, pkt = null, token = 0, busy = false;
+let cur = null, curId = '', active = -2, step = -1, done = 0, pkt = null, token = 0, busy = false, pageStage = 0;
 let trail = []; // ancestors: {id, step, origin}
 let cards = [];
 let seen = {};
@@ -36,26 +36,54 @@ const markSeen = (id) => { seen[id] = 1; try { localStorage.setItem('sot-seen', 
 /* ---------- scene geometry and drawing ---------- */
 function geo() {
   const W = svg.clientWidth, H = svg.clientHeight, small = W < 520;
-  const r = small ? 20 : 26, px = Math.min(96, Math.max(54, W * 0.13)), top = r + 30, bot = r + (small ? 46 : 70);
+  const r = small ? 20 : 26, px = Math.min(96, Math.max(54, W * 0.13)), top = r + 30, bot = r + (small ? 96 : 70);
   const P = {};
   for (const a of cur.actors) P[a.id] = { x: px + (a.x / 100) * (W - 2 * px), y: top + (a.y / 100) * (H - top - bot) };
   return { W, H, r, small, P };
 }
 const idx = (id) => cur.actors.findIndex((a) => a.id === id);
-function seg(m, g) {
+function seg(m, g, lane = 0) {
   const [f, t] = m, fw = idx(f) < idx(t);
   const lo = g.P[fw ? f : t], hi = g.P[fw ? t : f];
-  const bx = hi.x - lo.x, by = hi.y - lo.y, L = Math.hypot(bx, by) || 1, n = { x: -by / L, y: bx / L }, o = fw ? 9 : -9;
+  const bx = hi.x - lo.x, by = hi.y - lo.y, L = Math.hypot(bx, by) || 1, n = { x: -by / L, y: bx / L };
+  const sign = fw ? 1 : -1, o = sign * (9 + lane * 5);
   const F = g.P[f], T = g.P[t], u = { x: (T.x - F.x) / L, y: (T.y - F.y) / L }, d = g.r + 9;
-  return { x1: F.x + u.x * d + n.x * o, y1: F.y + u.y * d + n.y * o, x2: T.x - u.x * d + n.x * o, y2: T.y - u.y * d + n.y * o, n, o };
+  return { x1: F.x + u.x * d + n.x * o, y1: F.y + u.y * d + n.y * o, x2: T.x - u.x * d + n.x * o, y2: T.y - u.y * d + n.y * o, n, o, sign };
 }
-function chip(x, y, m, i, W, fly, mini) {
-  const label = m[2], k = m[3] || 'p', w = mini ? 26 : Math.round(label.length * 6.9 + 30), h = mini ? 17 : 26;
+// How far a packet's label sits from its line. Repeat trips in the same direction get their own lane.
+function labelOffset(g, lane, mini) {
+  if (g.small) return 12 + lane * 24 + (mini ? 0 : 12);
+  return 32 + lane * 46;
+}
+// Lane = how many earlier messages in this step went the same way between the same two actors.
+const lanesOf = (ms) => ms.map((m, i) => ms.slice(0, i).filter((x) => x[0] === m[0] && x[1] === m[1]).length);
+
+function chip(x, y, m, i, W, opts = {}) {
+  const { fly = false, mini = false, num = 0 } = opts;
+  const label = m[2], k = m[3] || 'p', env = k === 'e';
+  const numW = num && !mini ? 24 : 0;
+  const w = mini ? 32 : Math.round(label.length * 8.1 + 24 + numW + (env ? 8 : 46)), h = mini ? 20 : 38;
   x = Math.max(w / 2 + 4, Math.min(W - w / 2 - 4, x));
-  const body = k === 'e'
-    ? `<rect class="env" width="${w}" height="${h}" rx="3"/><path class="flap" d="M1.5 1.5L${w / 2} ${h * 0.55}L${w - 1.5} 1.5"/><circle class="seal" cx="${w / 2}" cy="${h * 0.55}" r="3"/>`
-    : `<rect class="pc" width="${w}" height="${h}" rx="3"/><rect class="stamp" x="${w - (mini ? 9 : 14)}" y="${mini ? 3 : 4}" width="${mini ? 5 : 9}" height="${mini ? 6 : 10}" rx="1"/>`;
-  return `<g class="chip k${k}${fly ? ' fly' : ''}" data-m="${i}" transform="translate(${x - w / 2},${y - h / 2})" aria-label="${esc(label)}">${body}${mini ? `<title>${esc(label)}</title>` : `<text class="ct" x="9" y="17.5">${esc(label)}</text>`}</g>`;
+  let body;
+  if (mini) {
+    body = env
+      ? `<rect class="env" width="${w}" height="${h}" rx="2"/><path class="flap" d="M1.5 1.5L${w / 2} ${h * 0.55}L${w - 1.5} 1.5"/>`
+      : `<rect class="pc" width="${w}" height="${h}" rx="2"/><rect class="stamp" x="${w - 10}" y="3.5" width="6.5" height="7.5"/>`;
+  } else if (env) {
+    body = `<rect class="env" width="${w}" height="${h}" rx="3"/><path class="flap" d="M2 2L${w / 2} 15L${w - 2} 2"/>`
+      + `<circle class="seal" cx="${w / 2}" cy="15" r="5.5"/><path class="sealx" d="M${w / 2 - 2.6} 15h5.2M${w / 2} ${15 - 2.6}v5.2"/>`;
+  } else {
+    // postcard: perforated stamp with a little house, and wavy postmark lines beside it
+    const sx = w - 31;
+    body = `<rect class="pc" width="${w}" height="${h}" rx="3"/>`
+      + `<path class="pm" d="M${sx - 14} 13q3.5-3 7 0t7 0M${sx - 14} 19q3.5-3 7 0t7 0M${sx - 14} 25q3.5-3 7 0t7 0"/>`
+      + `<rect class="stamp" x="${sx}" y="6" width="23" height="26" rx="1"/>`
+      + `<path class="house" d="M${sx + 5.5} 18l6-5 6 5v7h-12z"/>`;
+  }
+  const ty = env ? 31 : 24.5;
+  const badge = numW ? `<circle class="num" cx="16" cy="${env ? 26 : 19}" r="9"/><text class="numt" x="16" y="${(env ? 26 : 19) + 4.5}">${num}</text>` : '';
+  const text = mini ? `<title>${esc(label)}</title>${num ? `<text class="mnum" x="${env ? w / 2 : 11}" y="${env ? 17.5 : 14.5}">${num}</text>` : ''}` : `<text class="ct" x="${12 + numW}" y="${ty}">${esc(label)}</text>`;
+  return `<g class="chip k${k}${fly ? ' fly' : ''}${mini ? ' mini' : ''}" data-m="${i}" transform="translate(${x - w / 2},${y - h / 2})" aria-label="${esc(label)}">${body}${badge}${text}</g>`;
 }
 const zoomActor = (st) => (st && (st.m?.[0]?.[1] || st.on?.[0])) || null;
 
@@ -64,27 +92,29 @@ function draw() {
   const g = geo(), st = step >= 0 ? cur.steps[step] : null, ms = st?.m || [], on = new Set(st?.on || []);
   ms.forEach((m) => { on.add(m[0]); on.add(m[1]); });
   let h = '<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0 0L10 5L0 10z"/></marker><marker id="ahb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ahb" d="M0 0L10 5L0 10z"/></marker></defs>';
-  for (const [a, b] of cur.links || []) h += `<line class="lnk" x1="${g.P[a].x}" y1="${g.P[a].y}" x2="${g.P[b].x}" y2="${g.P[b].y}"/>`;
+  for (const [a, b] of cur.links || []) h += `<line class="lnk${st?.page ? ' dim' : ''}" x1="${g.P[a].x}" y1="${g.P[a].y}" x2="${g.P[b].x}" y2="${g.P[b].y}"/>`;
   let chips = '';
-  const spread = g.small ? 3.6 : 2.7;
+  const lanes = lanesOf(ms), numbered = ms.length > 1;
   ms.slice(0, done).forEach((m, i) => {
-    const s = seg(m, g), k = m[3] || 'p', lost = k === 'l';
+    const s = seg(m, g, lanes[i]), k = m[3] || 'p', lost = k === 'l';
     const ex = lost ? s.x1 + (s.x2 - s.x1) * 0.55 : s.x2, ey = lost ? s.y1 + (s.y2 - s.y1) * 0.55 : s.y2;
     h += `<line class="tr k${k}" x1="${s.x1}" y1="${s.y1}" x2="${ex}" y2="${ey}"${lost ? '' : ` marker-end="url(#${k === 'x' ? 'ahb' : 'ah'})"`}/>`;
     if (lost) h += `<path class="tr kx" d="M${ex - 6} ${ey - 6}l12 12M${ex + 6} ${ey - 6}l-12 12" stroke-width="2.5"/>`;
     // On narrow screens only the newest packet keeps its label; earlier ones shrink (still tappable).
-    const mini = g.small && i < done - 1, sp = mini ? 1.6 : spread;
-    chips += chip((s.x1 + ex) / 2 + s.n.x * s.o * sp, (s.y1 + ey) / 2 + s.n.y * s.o * sp, m, i, g.W, false, mini);
+    const mini = g.small, off = s.sign * labelOffset(g, lanes[i], mini);
+    chips += chip((s.x1 + ex) / 2 + s.n.x * off, (s.y1 + ey) / 2 + s.n.y * off, m, i, g.W, { mini, num: numbered ? i + 1 : 0 });
   });
   const sc = g.r / 21;
   for (const a of cur.actors) {
     const p = g.P[a.id], bd = st?.b?.[a.id];
-    h += `<g class="node${on.has(a.id) ? ' on' : ''}${a.icon === 'hood' ? ' bad' : ''}" transform="translate(${p.x},${p.y})">`
+    const half = Math.max(a.l.length * 3.8, (a.term && !g.small ? a.term.length * 3.3 : 0), (bd ? bd.length * 3.6 : 0)) + 4;
+    const dx = Math.max(half, Math.min(g.W - half, p.x)) - p.x;
+    h += `<g class="node${on.has(a.id) ? ' on' : ''}${a.icon === 'hood' ? ' bad' : ''}${st?.page && st.page !== a.id ? ' dim' : ''}" transform="translate(${p.x},${p.y})">`
       + `<circle class="halo" r="${g.r + 5}"/><circle class="disc" r="${g.r}"/>`
       + `<g class="ico" transform="translate(${-12 * sc},${-12 * sc}) scale(${sc})">${ICONS[a.icon] || ICONS.server}</g>`
-      + `<text class="lb" y="${g.r + 18}">${esc(a.l)}</text>`
-      + (a.term && !g.small ? `<text class="tm" y="${g.r + 33}">${esc(a.term)}</text>` : '')
-      + (bd ? `<text class="bd" y="${g.r + (a.term && !g.small ? 50 : 34)}">${esc(bd)}</text>` : '')
+      + `<text class="lb" x="${dx}" y="${g.r + 18}">${esc(a.l)}</text>`
+      + (a.term && !g.small ? `<text class="tm" x="${dx}" y="${g.r + 33}">${esc(a.term)}</text>` : '')
+      + (bd ? `<text class="bd" x="${dx}" y="${g.r + (a.term && !g.small ? 50 : 34)}">${esc(bd)}</text>` : '')
       + '</g>';
   }
   if (st?.zoom && TOPICS[st.zoom]) {
@@ -92,12 +122,57 @@ function draw() {
     h += `<g class="zb" data-zoom="${st.zoom}" role="button" aria-label="Zoom into ${esc(nameOf(st.zoom))}" transform="translate(${z.x + g.r * 0.85},${z.y - g.r * 0.85})"><circle r="13"/><path d="M-5 0h10M0-5v10"/></g>`;
   }
   h += chips;
+  if (st?.page && g.P[st.page]) h += browserPage(g, g.P[st.page], pageStage);
   if (pkt && ms[pkt.i]) {
-    const m = ms[pkt.i], s = seg(m, g), t = pkt.t, k = m[3] || 'p';
+    const m = ms[pkt.i], s = seg(m, g, lanes[pkt.i]), t = pkt.t, k = m[3] || 'p';
     const op = k === 'l' && t > 0.5 ? Math.max(0, 1 - (t - 0.5) * 4) : 1;
-    h += `<g opacity="${op}">${chip(s.x1 + (s.x2 - s.x1) * t, s.y1 + (s.y2 - s.y1) * t, m, pkt.i, g.W, true)}</g>`;
+    h += `<g opacity="${op}">${chip(s.x1 + (s.x2 - s.x1) * t, s.y1 + (s.y2 - s.y1) * t, m, pkt.i, g.W, { fly: true, mini: g.small, num: numbered ? pkt.i + 1 : 0 })}</g>`;
   }
+  // Phones: the packet in flight, or the newest one, gets its full label in a strip along the bottom.
+  const focus = pkt ? pkt.i : done - 1;
+  if (g.small && ms[focus]) h += chip(g.W / 2, g.H - 26, ms[focus], focus, g.W, { num: numbered ? focus + 1 : 0 });
   svg.innerHTML = h;
+}
+
+/* ---------- a browser page that builds itself (step field `page`) ---------- */
+const PAGE_STAGES = ['', 'Structure, from the HTML', 'Colours and layout, from style.css', 'The picture, from logo.png', 'Page loaded'];
+function browserPage(g, at, stage) {
+  const w = Math.min(360, g.W * (g.small ? 0.72 : 0.6)), hh = w * 0.68;
+  let x = Math.max(at.x + g.r + 28, g.W / 2 - w / 2 + 20);
+  x = Math.min(x, g.W - w - 10);
+  if (x < 10) x = 10;
+  const y = Math.max(12, Math.min(g.H - hh - 40, at.y - hh * 0.62));
+  const bar = 26, ix = x + 12, iw = w - 24, top = y + bar + 10;
+  const styled = stage >= 2;
+  let h = `<g class="page">`;
+  h += `<path class="plink" d="M${at.x + g.r + 4} ${at.y}L${x} ${Math.min(y + hh - 8, Math.max(y + 8, at.y))}"/>`;
+  h += `<rect class="pwin" x="${x}" y="${y}" width="${w}" height="${hh}" rx="8"/>`;
+  h += `<path class="pbar" d="M${x} ${y + bar}h${w}"/>`;
+  h += `<circle class="pdot" cx="${x + 12}" cy="${y + 13}" r="3.5"/><circle class="pdot" cx="${x + 23}" cy="${y + 13}" r="3.5"/><circle class="pdot" cx="${x + 34}" cy="${y + 13}" r="3.5"/>`;
+  h += `<rect class="paddr" x="${x + 46}" y="${y + 6}" width="${w - 56}" height="15" rx="7.5"/>`;
+  h += `<g class="plock" transform="translate(${x + 53},${y + 8})"><rect y="4.5" width="8" height="6.5" rx="1"/><path d="M1.8 5V3.4a2.2 2.2 0 0 1 4.4 0V5"/></g>`;
+  if (w > 220) h += `<text class="paddrt" x="${x + 66}" y="${y + 17.5}">https://www.example.com/</text>`;
+  if (stage >= 1) {
+    const hb = hh * 0.16, picW = iw * 0.38, picH = hh * 0.34, rowY = top + hb + 12;
+    h += `<rect class="${styled ? 'phead' : 'pblock'}" x="${ix}" y="${top}" width="${iw}" height="${hb}" rx="3"/>`;
+    h += `<rect class="${styled ? 'ptitle' : 'pblock2'}" x="${ix + 10}" y="${top + hb * 0.32}" width="${iw * 0.45}" height="${hb * 0.36}" rx="2"/>`;
+    if (stage >= 3) {
+      h += `<g class="ppic"><rect x="${ix}" y="${rowY}" width="${picW}" height="${picH}" rx="3"/><circle cx="${ix + picW * 0.72}" cy="${rowY + picH * 0.3}" r="${picH * 0.12}"/><path d="M${ix} ${rowY + picH}l${picW * 0.35} ${-picH * 0.55} ${picW * 0.2} ${picH * 0.25} ${picW * 0.2} ${-picH * 0.2} ${picW * 0.25} ${picH * 0.5}z"/></g>`;
+    } else {
+      h += `<rect class="pblock" x="${ix}" y="${rowY}" width="${picW}" height="${picH}" rx="3"/>`;
+    }
+    for (let k = 0; k < 4; k++) {
+      h += `<rect class="${styled ? 'ptext' : 'pblock'}" x="${ix + picW + 12}" y="${rowY + 4 + k * (picH / 4.2)}" width="${(iw - picW - 12) * (k === 3 ? 0.6 : 1)}" height="${Math.max(4, picH / 9)}" rx="2"/>`;
+    }
+    for (let k = 0; k < 2; k++) {
+      h += `<rect class="${styled ? 'ptext' : 'pblock'}" x="${ix}" y="${rowY + picH + 12 + k * 12}" width="${iw * (k ? 0.7 : 1)}" height="${Math.max(4, picH / 9)}" rx="2"/>`;
+    }
+  }
+  if (stage >= 4) {
+    h += `<g class="pdone" transform="translate(${x + w - 6},${y + hh - 6})"><circle r="15"/><path d="M-6 0l4 4 8-8"/></g>`;
+  }
+  if (stage >= 1) h += `<text class="pstage" x="${x + w / 2}" y="${y + hh + 26}">${esc(PAGE_STAGES[stage])}</text>`;
+  return h + '</g>';
 }
 
 /* ---------- step animation ---------- */
@@ -117,9 +192,9 @@ function fly(i, tok) {
 }
 async function run(i, instant) {
   const tok = ++token;
-  step = i; done = 0; pkt = null;
-  const ms = cur.steps[i].m || [];
-  if (instant || RM.matches) { done = ms.length; draw(); return; }
+  step = i; done = 0; pkt = null; pageStage = 0;
+  const st = cur.steps[i], ms = st.m || [];
+  if (instant || RM.matches) { done = ms.length; pageStage = 4; draw(); return; }
   draw();
   await wait(200);
   for (let k = 0; k < ms.length; k++) {
@@ -128,6 +203,13 @@ async function run(i, instant) {
     if (tok !== token) return;
     pkt = null; done = k + 1; draw();
     await wait(300);
+  }
+  if (st.page) {
+    for (let k = 1; k <= 4; k++) {
+      await wait(k === 1 ? 500 : 1300);
+      if (tok !== token) return;
+      pageStage = k; draw();
+    }
   }
   // Replay while the reader stays on this step, but never while they're looking inside
   // a packet, the tab is hidden, or a zoom is under way.
@@ -143,7 +225,7 @@ function activate(i, instant) {
   if (!cur.steps) return;
   const n = cur.steps.length;
   if (i < 0) { token++; step = -1; done = 0; pkt = null; draw(); }
-  else if (i >= n) { token++; step = n - 1; done = (cur.steps[n - 1].m || []).length; pkt = null; draw(); }
+  else if (i >= n) { token++; step = n - 1; done = (cur.steps[n - 1].m || []).length; pageStage = 4; pkt = null; draw(); }
   else run(i, instant);
 }
 
@@ -171,8 +253,8 @@ function scrollToCard(i) {
 }
 
 /* ---------- captions ---------- */
-const POSTCARD = '<svg viewBox="0 0 44 26" aria-hidden="true"><g class="chip kp"><rect class="pc" x="1" y="1" width="42" height="24" rx="3"/><rect class="stamp" x="30" y="5" width="9" height="10" rx="1"/></g></svg>';
-const ENVELOPE = '<svg viewBox="0 0 44 26" aria-hidden="true"><g class="chip ke"><rect class="env" x="1" y="1" width="42" height="24" rx="3"/><path class="flap" d="M2.5 2.5L22 15L41.5 2.5"/><circle class="seal" cx="22" cy="15" r="3"/></g></svg>';
+const POSTCARD = '<svg viewBox="0 0 64 38" aria-hidden="true"><g class="chip kp"><rect class="pc" x="1" y="1" width="62" height="36" rx="3"/><path class="pm" d="M19 13q3.5-3 7 0t7 0M19 19q3.5-3 7 0t7 0M19 25q3.5-3 7 0t7 0"/><rect class="stamp" x="36" y="6" width="23" height="26" rx="1"/><path class="house" d="M41.5 18l6-5 6 5v7h-12z"/></g></svg>';
+const ENVELOPE = '<svg viewBox="0 0 64 38" aria-hidden="true"><g class="chip ke"><rect class="env" x="1" y="1" width="62" height="36" rx="3"/><path class="flap" d="M3 3L32 16L61 3"/><circle class="seal" cx="32" cy="16" r="5.5"/><path class="sealx" d="M29.4 16h5.2M32 13.4v5.2"/></g></svg>';
 
 function zoomButton(id, why, cls = '') {
   const t = TOPICS[id];
@@ -202,14 +284,14 @@ function renderCaptions() {
 }
 function renderTrail() {
   $('#trail').innerHTML = trail.map((e, k) => `<button data-back="${k}">${esc(nameOf(e.id))}</button><span class="sep" aria-hidden="true">›</span>`).join('')
-    + `<span class="here" aria-current="location">${esc(nameOf(curId))}</span>`;
+    + `<span class="here" aria-current="location">${esc(cur.title)}</span>`;
   const p = trail.at(-1);
   backBtn.hidden = !p;
   if (p) { backBtn.textContent = `↑ Back out to ${nameOf(p.id)}`; backBtn.dataset.back = trail.length - 1; }
 }
 function renderMenu() {
   $('#menuList').innerHTML = GROUPS.map(([g, ids]) => `<h3>${esc(g)}</h3>` + ids.map((id) =>
-    `<a href="#${id}"${id === curId ? ' aria-current="page"' : ''}>${esc(nameOf(id))}<small>${TOPICS[id].steps ? (seen[id] ? '✓ seen' : '') : 'soon'}</small></a>`).join('')).join('');
+    `<a href="#${id}"${id === curId ? ' aria-current="page"' : ''}>${esc(TOPICS[id].title)}<small>${TOPICS[id].steps ? (seen[id] ? '✓ seen' : '') : 'soon'}</small></a>`).join('')).join('');
 }
 
 /* ---------- loading topics and zooming ---------- */
@@ -277,8 +359,8 @@ function gibberish(s) {
   return out.join(' ');
 }
 const KINDS = {
-  p: ['Postcard', 'Anyone along the way can read this, and could change it.'],
-  e: ['Sealed envelope', 'Only the two ends hold the key. Anyone else sees scrambled bytes, and any change would be detected.'],
+  p: ['A postcard', 'Anyone who handles it along the way can read it, and could change it.'],
+  e: ['A sealed envelope', 'Only the two ends hold the key. Anyone else sees scrambled bytes, and any change would be detected.'],
   x: ['Forgery', 'Made by the attacker to look like the real thing.'],
   l: ['Lost on the way', 'It never arrived. With no reply, the sender will notice and send it again.'],
 };
@@ -342,6 +424,10 @@ addEventListener('hashchange', () => {
 });
 const ro = new ResizeObserver(() => { draw(); onScroll(); });
 ro.observe(svg);
+// The header stays pinned; the scene sits just below it, so publish its height to CSS.
+const header = $('.top');
+const headerRo = new ResizeObserver(() => document.documentElement.style.setProperty('--hh', `${header.offsetHeight}px`));
+headerRo.observe(header);
 
 const start = TOPICS[location.hash.slice(1)] ? location.hash.slice(1) : 'journey';
 load(start);

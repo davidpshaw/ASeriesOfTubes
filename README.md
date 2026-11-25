@@ -71,6 +71,7 @@ heading in `GROUPS`:
     { t: 'Step title', d: 'Narration. Link with <a href="#dns">DNS</a>.',
       m: [ ['a', 'b', 'hello', 'p', 'Full text shown when tapped'], ['b', 'a', 'hi', 'e'] ],  // from, to, label, kind, inside
       on: ['a'], b: { b: 'badge under b' }, zoom: 'tls' },     // zoom: topic this step opens into
+    { t: 'Last step', d: '…', page: 'a' },                     // page: draw a browser page building itself next to actor a
   ],
   deeper: [ ['tls', 'Why this links to TLS'] ],
   cmd: 'the command', out: 'sample output', note: 'What to look for in the output.',
@@ -81,7 +82,12 @@ Message kinds: `p` postcard (readable by anyone on the path), `e` sealed envelop
 attacker, `l` lost. Icons: `laptop`, `server`, `book`, `globe`, `drawers`, `doc`, `seal`, `hood`, `bank`.
 A topic without `steps` shows as "coming soon"; give it a `plan` list instead.
 
-Run `npm test` afterwards. It checks every topic: actors, messages, badges, links and groups.
+Writing rules (checked by `npm test` where possible):
+- Spell out each abbreviation at its first use in every topic, name first: "Domain Name System (DNS)".
+- Label actors with the same words the captions use.
+- Explain every packet label in that step's caption, and give the packet plain-words contents to show when tapped.
+
+Run `npm test` afterwards. It checks every topic: actors, messages, badges, links, groups and abbreviations.
 
 ## Development
 

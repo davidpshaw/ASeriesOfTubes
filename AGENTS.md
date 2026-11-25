@@ -28,6 +28,17 @@ is a nod to the 2006 "series of tubes" description of the internet.
   `public/app.js` should not need changes to add a topic.
 - Write narration for a non-programmer: plain words first, then the exact term
   in **bold**. Link related topics with `<a href="#topic-id">`.
+- **Spell out every abbreviation at its first use in each topic**, name first:
+  "Domain Name System (DNS)", then "DNS" afterwards. Readers can land on any
+  topic directly, so this is per topic, counting the title and blurb. The
+  `ACRONYMS` list in `test/topics.test.js` enforces it; add new abbreviations
+  there.
+- **Diagram labels use the caption's own words.** An actor's `l` must be the
+  name the captions use (the component the user asks is always "DNS Server").
+  No invented metaphor names. `term` is an optional subtitle.
+- **Explain every packet label in that step's caption** (SYN, ClientHello,
+  200 OK…), not only in a deeper topic, and give the packet a plain-words
+  `inside` for its popover.
 - Be technically accurate. Use documentation-only addresses and names in
   examples: `192.0.2.x`, `198.51.100.x`, `203.0.113.x`, `example.com`,
   `*.example`. Mark terminal output as sample output.
@@ -37,6 +48,8 @@ is a nod to the 2006 "series of tubes" description of the internet.
 - Message kinds: `p` postcard (readable on the wire), `e` sealed envelope
   (encrypted), `x` forged/attacker, `l` lost. Keep labels short; put the full
   contents in the optional 5th field.
+- A step's `page: actorId` draws a browser window next to that actor and builds
+  it in stages (HTML structure, then styles, then image, then done).
 - `npm test` validates every topic (actors, messages, links, groups). Keep it
   passing; extend `test/topics.test.js` when the topic format grows.
 
@@ -47,13 +60,18 @@ is a nod to the 2006 "series of tubes" description of the internet.
   10 s after it finishes (`REPLAY_MS`) while its card stays active, except while
   a packet popover is open or the tab is hidden. ← / → jump between cards. No
   play/pause or step buttons.
-- **Mail is the metaphor, not a legend.** Message kinds draw as a postcard
-  (`p`, readable), sealed envelope (`e`, encrypted), red postcard (`x`, forged)
-  or dashed postcard (`l`, lost). Tapping a packet opens a popover with what's
+- **Mail is the metaphor, not a legend.** Message kinds draw as a postcard with
+  a perforated stamp and postmark (`p`, readable), a dark sealed envelope with a
+  wax seal (`e`, encrypted), a red postcard (`x`, forged) or a dashed postcard
+  (`l`, lost). Packet labels are 15px. When a step has several packets they are
+  numbered in sending order, and repeat trips in the same direction stack in
+  their own lanes so labels never overlap. On phones (scene < 520px wide) every
+  packet draws small and numbered, and the newest one's full label shows in a
+  strip along the bottom of the scene. Tapping a packet opens a popover with what's
   inside (the optional 5th message field), and for envelopes what an
   eavesdropper sees.
-- **Actors use plain names first** (`l`, e.g. "Phone book") with the real term
-  underneath (`term`, e.g. "DNS resolver"), and an `icon`.
+- **The header is always visible** (sticky), with the breadcrumb trail. The
+  current topic shows its full title.
 - **Drilling down is zooming.** A step's `zoom`, a "+" badge in the scene, a
   "Go deeper" button, or a topic link in narration zooms into that topic inside
   the same scene. "Back out" (button, breadcrumb, or Esc) zooms back to the

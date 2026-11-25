@@ -8,6 +8,22 @@ import { TOPICS, GROUPS } from '../public/topics.js';
 const ids = Object.keys(TOPICS);
 const KINDS = new Set(['p', 'e', 'x', 'l']);
 const ICONS = new Set(['laptop', 'server', 'book', 'globe', 'drawers', 'doc', 'seal', 'hood', 'bank']);
+// Every abbreviation must be spelled out at its first use in each topic, e.g. "Domain Name System (DNS)".
+const ACRONYMS = {
+  ACK: 'acknowledge', ACME: 'Automatic Certificate Management Environment', ASLR: 'address space layout randomization',
+  BGP: 'Border Gateway Protocol', CA: 'Certificate Authority', CDN: 'content delivery network', CSS: 'Cascading Style Sheets',
+  DNS: 'Domain Name System', DNSSEC: 'Domain Name System Security Extensions', ECH: 'Encrypted Client Hello',
+  FIN: 'finish', HSTS: 'HTTP Strict Transport Security', HTML: 'Hypertext Markup Language', HTTP: 'Hypertext Transfer Protocol',
+  HTTPS: 'Hypertext Transfer Protocol Secure', IP: 'Internet Protocol', ISP: 'Internet service provider',
+  MITM: 'man-in-the-middle', NAT: 'network address translation', OS: 'operating system', SNI: 'Server Name Indication',
+  SSH: 'Secure Shell', SSL: 'Secure Sockets Layer', SYN: 'synchronize', TCP: 'Transmission Control Protocol',
+  TLD: 'top-level domain', TLS: 'Transport Layer Security', TTL: 'time to live', UDP: 'User Datagram Protocol',
+  URL: 'Uniform Resource Locator', VPN: 'virtual private network',
+};
+const plain = (html) => html.replace(/<[^>]+>/g, '');
+// The words a reader meets, in order: title, blurb, each step's title and caption, then the closing card.
+const readingText = (t) => [t.title, t.blurb, ...(t.steps ?? []).flatMap((s) => [s.t, plain(s.d)]),
+  ...(t.plan ?? []), ...(t.deeper ?? []).map(([, why]) => why), t.note ?? ''].join('\n');
 const linksIn = (html) => [...html.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]);
 
 test('topic ids are simple slugs', () => {
@@ -73,5 +89,26 @@ test('animated topics are well formed', () => {
       for (const target of linksIn(s.d)) assert.ok(TOPICS[target], `${where}: narration links to unknown topic "${target}"`);
     });
     assert.ok(t.cmd && t.out && t.note, `${id}: the "Dive deeper" panel needs cmd, out and note`);
+  }
+});
+
+test('abbreviations are spelled out at their first use in every topic', () => {
+  for (const [id, t] of Object.entries(TOPICS)) {
+    const text = readingText(t);
+    for (const [abbr, full] of Object.entries(ACRONYMS)) {
+      const m = new RegExp(`\\b${abbr}s?\\b`).exec(text);
+      if (!m) continue;
+      const before = text.slice(Math.max(0, m.index - full.length - 12), m.index).toLowerCase();
+      assert.ok(before.endsWith('(') && before.includes(full.toLowerCase()),
+        `${id}: first "${abbr}" must read "${full} (${abbr})", found: …${text.slice(Math.max(0, m.index - 40), m.index + abbr.length)}`);
+    }
+  }
+});
+
+test('page drawings name a real actor', () => {
+  for (const [id, t] of Object.entries(TOPICS)) {
+    for (const s of t.steps ?? []) {
+      if (s.page !== undefined) assert.ok(t.actors.some((a) => a.id === s.page), `${id}: page drawn at unknown actor "${s.page}"`);
+    }
   }
 });
