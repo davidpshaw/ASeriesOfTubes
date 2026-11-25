@@ -76,7 +76,10 @@ is a nod to the 2006 "series of tubes" description of the internet.
   packet draws small and numbered, and the newest one's full label shows in a
   strip along the bottom of the scene. Tapping a packet opens a popover with what's
   inside (the optional 5th message field), and for envelopes what an
-  eavesdropper sees.
+  eavesdropper sees. Until a viewer has opened one packet (`sot-peeked` in
+  localStorage), the newest packet gets a "Click/Tap to look inside" pointer,
+  each landing packet ripples once, and caption cards with packets carry a
+  one-line tip. All three disappear for good after the first open.
 - **The header is always visible** (sticky), with the breadcrumb trail. The
   current topic shows its full title.
 - **Drilling down is zooming.** A step's `zoom`, a "+" badge in the scene, a
@@ -87,7 +90,7 @@ is a nod to the 2006 "series of tubes" description of the internet.
 - "Try it yourself" (real command + sample output) sits collapsed in the last card.
 - Respect `prefers-reduced-motion` (no packet flight, no zoom animation).
 - Light/dark follows `prefers-color-scheme`. Mobile-first; touch targets ≥ 44px.
-- `localStorage` only for "seen" marks, wrapped in try/catch.
+- `localStorage` only for "seen" marks and the look-inside hint, wrapped in try/catch.
 
 ## Layout
 ```

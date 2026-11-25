@@ -121,6 +121,12 @@ h1{font-size:clamp(32px,4vw,46px);line-height:1.05;margin:6px 0 12px;text-wrap:b
 .chip:hover .pc,.chip:hover .env{stroke-width:2.6}
 .chip.fly .pc,.chip.fly .env{stroke-width:2.2}
 .dim{opacity:.22}
+.hint{pointer-events:none}.hint rect,.hint path{fill:var(--brick)}.hint text{font:700 13px var(--sans);fill:#fff;text-anchor:middle}
+.chip .ring{fill:none;stroke:var(--brick);stroke-width:2.5;transform-box:fill-box;transform-origin:center;animation:ripple 1s ease-out 1 both}
+@keyframes ripple{from{opacity:.9;transform:scale(1)}to{opacity:0;transform:scale(1.35)}}
+.peek-hint{margin-top:12px!important;font-size:14px;color:var(--mute);display:flex;gap:8px;align-items:baseline}
+.peek-hint::before{content:"";flex:none;width:18px;height:11px;border:1.5px solid currentColor;border-radius:2px;translate:0 1px}
+.peeked .peek-hint{display:none}
 .page .pwin{fill:var(--panel);stroke:var(--ink);stroke-width:1.8}
 .page .pbar{stroke:var(--ink);stroke-width:1.2}
 .page .pdot{fill:var(--line)}

@@ -31,6 +31,16 @@ let trail = []; // ancestors: {id, step, origin}
 let cards = [];
 let seen = {};
 try { seen = JSON.parse(localStorage.getItem('sot-seen') || '{}'); } catch { /* storage unavailable */ }
+let peeked = false;
+try { peeked = localStorage.getItem('sot-peeked') === '1'; } catch { /* storage unavailable */ }
+const markPeeked = () => {
+  if (peeked) return;
+  peeked = true;
+  document.body.classList.add('peeked');
+  try { localStorage.setItem('sot-peeked', '1'); } catch { /* ignore */ }
+};
+if (peeked) document.body.classList.add('peeked');
+let landedAt = 0; // when the newest packet arrived, for its one-time ripple
 const markSeen = (id) => { seen[id] = 1; try { localStorage.setItem('sot-seen', JSON.stringify(seen)); } catch { /* ignore */ } };
 
 /* ---------- scene geometry and drawing ---------- */
@@ -70,7 +80,7 @@ function labelPos(g, s, mx, my, m, lane, mini, numbered) {
 const lanesOf = (ms) => ms.map((m, i) => ms.slice(0, i).filter((x) => x[0] === m[0] && x[1] === m[1]).length);
 
 function chip(x, y, m, i, W, opts = {}) {
-  const { fly = false, mini = false, num = 0 } = opts;
+  const { fly = false, mini = false, num = 0, land = false } = opts;
   const label = m[2], k = m[3] || 'p', env = k === 'e';
   const numW = num && !mini ? 24 : 0;
   const w = mini ? 32 : Math.round(label.length * 8.1 + 24 + numW + (env ? 8 : 46)), h = mini ? 20 : 38;
@@ -94,7 +104,8 @@ function chip(x, y, m, i, W, opts = {}) {
   const ty = env ? 31 : 24.5;
   const badge = numW ? `<circle class="num" cx="16" cy="${env ? 26 : 19}" r="9"/><text class="numt" x="16" y="${(env ? 26 : 19) + 4.5}">${num}</text>` : '';
   const text = mini ? `<title>${esc(label)}</title>${num ? `<text class="mnum" x="${env ? w / 2 : 11}" y="${env ? 17.5 : 14.5}">${num}</text>` : ''}` : `<text class="ct" x="${12 + numW}" y="${ty}">${esc(label)}</text>`;
-  return `<g class="chip k${k}${fly ? ' fly' : ''}${mini ? ' mini' : ''}" data-m="${i}" transform="translate(${x - w / 2},${y - h / 2})" aria-label="${esc(label)}">${body}${badge}${text}</g>`;
+  const ring = land ? `<rect class="ring" x="-3" y="-3" width="${w + 6}" height="${h + 6}" rx="6"/>` : '';
+  return `<g class="chip k${k}${fly ? ' fly' : ''}${mini ? ' mini' : ''}" data-m="${i}" transform="translate(${x - w / 2},${y - h / 2})" aria-label="${esc(label)}: look inside">${ring}${body}${badge}${text}</g>`;
 }
 const zoomActor = (st) => (st && (st.m?.[0]?.[1] || st.on?.[0])) || null;
 
@@ -108,7 +119,7 @@ function draw() {
   let h = '<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0 0L10 5L0 10z"/></marker><marker id="ahb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ahb" d="M0 0L10 5L0 10z"/></marker></defs>';
   const hideScene = g.small && ch;
   if (!hideScene) for (const [a, b] of cur.links || []) h += `<line class="lnk${st?.page ? ' dim' : ''}" x1="${g.P[a].x}" y1="${g.P[a].y}" x2="${g.P[b].x}" y2="${g.P[b].y}"/>`;
-  let chips = '';
+  let chips = '', hintAt = null;
   const lanes = lanesOf(ms), numbered = ms.length > 1;
   (hideScene ? [] : ms.slice(0, done)).forEach((m, i) => {
     const s = seg(m, g, lanes[i]), k = m[3] || 'p', lost = k === 'l';
@@ -116,7 +127,9 @@ function draw() {
     h += `<line class="tr k${k}" x1="${s.x1}" y1="${s.y1}" x2="${ex}" y2="${ey}"${lost ? '' : ` marker-end="url(#${k === 'x' ? 'ahb' : 'ah'})"`}/>`;
     if (lost) h += `<path class="tr kx" d="M${ex - 6} ${ey - 6}l12 12M${ex + 6} ${ey - 6}l-12 12" stroke-width="2.5"/>`;
     const mini = g.small, p = labelPos(g, s, (s.x1 + ex) / 2, (s.y1 + ey) / 2, m, lanes[i], mini, numbered);
-    chips += chip(p.x, p.y, m, i, g.W, { mini, num: numbered ? i + 1 : 0 });
+    const newest = i === done - 1 && !pkt, land = newest && !g.small && performance.now() - landedAt < 120 && !RM.matches;
+    chips += chip(p.x, p.y, m, i, g.W, { mini, land, num: numbered ? i + 1 : 0 });
+    if (newest && !g.small) hintAt = { x: Math.max(80, Math.min(g.W - 80, p.x)), y: p.y - 19 };
   });
   const sc = g.r / 21;
   for (const a of hideScene ? [] : cur.actors) {
@@ -145,7 +158,16 @@ function draw() {
   }
   // Phones: the packet in flight, or the newest one, gets its full label in a strip along the bottom.
   const focus = pkt ? pkt.i : done - 1;
-  if (g.small && ms[focus]) h += chip(g.W / 2, g.H - 26, ms[focus], focus, g.W, { num: numbered ? focus + 1 : 0 });
+  if (g.small && ms[focus]) {
+    const land = !pkt && performance.now() - landedAt < 120 && !RM.matches;
+    h += chip(g.W / 2, g.H - 26, ms[focus], focus, g.W, { land, num: numbered ? focus + 1 : 0 });
+    if (!pkt) hintAt = { x: g.W / 2, y: g.H - 45 };
+  }
+  // Until someone has opened a packet once, point at the newest one.
+  if (!peeked && hintAt && !hideScene) {
+    const txt = g.small ? 'Tap to look inside' : 'Click to look inside', bw = txt.length * 7.6 + 24, by = hintAt.y - 10 - 30;
+    h += `<g class="hint" transform="translate(${hintAt.x - bw / 2},${by})"><rect width="${bw}" height="30" rx="15"/><path d="M${bw / 2 - 7} 29.5l7 8 7-8z"/><text x="${bw / 2}" y="20">${txt}</text></g>`;
+  }
   svg.innerHTML = h;
 }
 
@@ -280,7 +302,7 @@ async function run(i, instant) {
     if (tok !== token) return;
     await fly(k, tok);
     if (tok !== token) return;
-    pkt = null; done = k + 1; draw();
+    pkt = null; done = k + 1; landedAt = performance.now(); draw();
     await wait(300);
   }
   for (let k = 1; k <= chainLen; k++) {
@@ -359,6 +381,7 @@ function renderCaptions() {
     h += `<p class="key"><span>${POSTCARD} A postcard: anyone along the way can read it.</span><span>${ENVELOPE} A sealed envelope: only the two ends can open it.</span></p><p class="hint">Scroll to start ↓ · tap any postcard or envelope to look inside</p></section>`;
     t.steps.forEach((s, i) => {
       h += `<section class="card" data-i="${i}"><span class="n">Step ${i + 1} of ${t.steps.length}</span><h2>${esc(s.t)}</h2><p>${s.d}</p>`
+        + (s.m?.length ? '<p class="peek-hint">Click or tap any postcard or envelope in the picture to see what’s inside.</p>' : '')
         + (s.zoom && TOPICS[s.zoom] ? zoomButton(s.zoom, 'Zoom in to see this step up close') : '') + '</section>';
     });
   } else {
@@ -463,6 +486,7 @@ const KINDS = {
 function showPop(i, el) {
   const m = cur.steps[step]?.m?.[i];
   if (!m) return;
+  if (!peeked) { markPeeked(); draw(); el = svg.querySelector(`.chip[data-m="${i}"]`) || el; }
   const k = m[3] || 'p', [title, what] = KINDS[k];
   pop.innerHTML = `<button class="x" aria-label="Close">×</button><p class="ph"></p><p class="pd"></p><p class="pd">${k === 'e' ? 'Inside, as the two ends see it:' : 'What it says:'}</p><pre class="in"></pre>${k === 'e' ? '<p class="pd">What anyone in between sees:</p><pre class="gib"></pre>' : ''}`;
   pop.querySelector('.ph').textContent = `${title}: ${m[2]}`;
