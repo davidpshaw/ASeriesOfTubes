@@ -43,8 +43,10 @@ is a nod to the 2006 "series of tubes" description of the internet.
 ## UI rules
 - **Scroll is the main control.** Each topic is an intro, one caption card per
   step, and a "Where next?" card. The scene is pinned (right on desktop, top on
-  phones) and plays whichever card crosses the trigger line. ← / → jump between
-  cards. No play/pause or step buttons.
+  phones) and plays whichever card crosses the trigger line. The step replays
+  10 s after it finishes (`REPLAY_MS`) while its card stays active, except while
+  a packet popover is open or the tab is hidden. ← / → jump between cards. No
+  play/pause or step buttons.
 - **Mail is the metaphor, not a legend.** Message kinds draw as a postcard
   (`p`, readable), sealed envelope (`e`, encrypted), red postcard (`x`, forged)
   or dashed postcard (`l`, lost). Tapping a packet opens a popover with what's

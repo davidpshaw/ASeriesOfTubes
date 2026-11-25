@@ -7,6 +7,7 @@ const $ = (s) => document.querySelector(s);
 const svg = $('#svg'), scene = $('#scene'), wrap = $('.scene-wrap'), caps = $('#captions');
 const pop = $('#pop'), backBtn = $('#back'), soon = $('#soonmsg');
 const RM = matchMedia('(prefers-reduced-motion: reduce)');
+const REPLAY_MS = 10000; // a step's animation repeats this long after it finishes
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const nameOf = (id) => TOPICS[id].short || TOPICS[id].title;
@@ -128,6 +129,11 @@ async function run(i, instant) {
     pkt = null; done = k + 1; draw();
     await wait(300);
   }
+  // Replay while the reader stays on this step, but never while they're looking inside
+  // a packet, the tab is hidden, or a zoom is under way.
+  await wait(REPLAY_MS);
+  while (tok === token && (!pop.hidden || document.hidden || busy)) await wait(1000);
+  if (tok === token) run(i);
 }
 function activate(i, instant) {
   if (i === active) return;
