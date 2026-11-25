@@ -9,9 +9,12 @@ In 2006 a US senator famously described the internet as "a series of tubes." Thi
 answer: a small, self-contained web app that shows what really happens between typing a URL and seeing a
 page, and lets you drill into each piece.
 
-- **Watch it:** each topic is an animation of messages moving between the machines involved
-- **Read it:** plain-English narration for every step, with links to related topics
-- **Dive deeper:** the real command that shows the same thing on your own computer, with sample output
+- **Scroll the story:** each step's caption plays its part of the animation as you reach it
+- **Postcards and sealed envelopes:** readable traffic is a postcard, encrypted traffic is a sealed
+  envelope. Tap any of them to look inside, and to see what an eavesdropper would see
+- **Zoom in:** any step can zoom into its own topic (the DNS step opens up into the DNS lookup
+  chain) and back out to exactly where you were
+- **Try it yourself:** the real command that shows the same thing on your own computer, with sample output
 - Start with *What happens when you type a URL*, then go deeper into DNS, TCP, TLS, HTTP and
   man-in-the-middle attacks. IP routing, certificates, key exchange, proxies, SSH, VPNs and buffer
   overflows are on the way.
@@ -61,20 +64,21 @@ heading in `GROUPS`:
 ```js
 'my-topic': {
   title: 'My topic', short: 'Sidebar name', blurb: 'One sentence under the title.',
-  actors: [ { id: 'a', l: 'Client', sub: 'small caption', x: 0, y: 50 },
-            { id: 'b', l: 'Server', x: 100, y: 50 } ],          // x, y are 0–100 across the scene
+  actors: [ { id: 'a', l: 'Your computer', term: 'client', icon: 'laptop', x: 0, y: 50 },
+            { id: 'b', l: 'The website', term: 'server', icon: 'server', x: 100, y: 50 } ],  // x, y: 0–100
   links: [ ['a', 'b'] ],                                         // faint lines between actors
   steps: [
     { t: 'Step title', d: 'Narration. Link with <a href="#dns">DNS</a>.',
-      m: [ ['a', 'b', 'hello', 'p'], ['b', 'a', 'hi', 'e'] ],    // from, to, label, kind
-      on: ['a'], b: { b: 'badge under b' } },
+      m: [ ['a', 'b', 'hello', 'p', 'Full text shown when tapped'], ['b', 'a', 'hi', 'e'] ],  // from, to, label, kind, inside
+      on: ['a'], b: { b: 'badge under b' }, zoom: 'tls' },     // zoom: topic this step opens into
   ],
   deeper: [ ['tls', 'Why this links to TLS'] ],
   cmd: 'the command', out: 'sample output', note: 'What to look for in the output.',
 },
 ```
 
-Message kinds: `p` readable by anyone on the path, `e` encrypted, `x` forged or attacker, `l` lost.
+Message kinds: `p` postcard (readable by anyone on the path), `e` sealed envelope (encrypted), `x` forged or
+attacker, `l` lost. Icons: `laptop`, `server`, `book`, `globe`, `drawers`, `doc`, `seal`, `hood`, `bank`.
 A topic without `steps` shows as "coming soon"; give it a `plan` list instead.
 
 Run `npm test` afterwards. It checks every topic: actors, messages, badges, links and groups.

@@ -34,17 +34,31 @@ is a nod to the 2006 "series of tubes" description of the internet.
 - Security topics explain how an attack works and how it is defended against,
   conceptually and visually. **Never include working exploit code, shellcode or
   step-by-step attack instructions.**
-- Message kinds: `p` readable on the wire, `e` encrypted, `x` forged/attacker,
-  `l` lost. Keep labels short (they render as chips).
+- Message kinds: `p` postcard (readable on the wire), `e` sealed envelope
+  (encrypted), `x` forged/attacker, `l` lost. Keep labels short; put the full
+  contents in the optional 5th field.
 - `npm test` validates every topic (actors, messages, links, groups). Keep it
   passing; extend `test/topics.test.js` when the topic format grows.
 
 ## UI rules
-- Each topic: animated scene → numbered steps with narration → "Go deeper" links
-  → collapsed "Dive deeper" panel (real command + sample output).
+- **Scroll is the main control.** Each topic is an intro, one caption card per
+  step, and a "Where next?" card. The scene is pinned (right on desktop, top on
+  phones) and plays whichever card crosses the trigger line. ← / → jump between
+  cards. No play/pause or step buttons.
+- **Mail is the metaphor, not a legend.** Message kinds draw as a postcard
+  (`p`, readable), sealed envelope (`e`, encrypted), red postcard (`x`, forged)
+  or dashed postcard (`l`, lost). Tapping a packet opens a popover with what's
+  inside (the optional 5th message field), and for envelopes what an
+  eavesdropper sees.
+- **Actors use plain names first** (`l`, e.g. "Phone book") with the real term
+  underneath (`term`, e.g. "DNS resolver"), and an `icon`.
+- **Drilling down is zooming.** A step's `zoom`, a "+" badge in the scene, a
+  "Go deeper" button, or a topic link in narration zooms into that topic inside
+  the same scene. "Back out" (button, breadcrumb, or Esc) zooms back to the
+  exact step you left. The All topics menu jumps directly and clears the trail.
 - Topics without `steps` render as "coming soon" with their `plan` outline.
-- Routing is by plain hash (`#dns`); a breadcrumb trail follows drill-downs.
-- Keyboard: ← / → step, space plays/pauses. Respect `prefers-reduced-motion`.
+- "Try it yourself" (real command + sample output) sits collapsed in the last card.
+- Respect `prefers-reduced-motion` (no packet flight, no zoom animation).
 - Light/dark follows `prefers-color-scheme`. Mobile-first; touch targets ≥ 44px.
 - `localStorage` only for "seen" marks, wrapped in try/catch.
 
@@ -53,7 +67,7 @@ is a nod to the 2006 "series of tubes" description of the internet.
 src/server.js     Static file server: in-memory files, ETags, security headers, /healthz
 public/index.html Page shell
 public/app.css    Styles
-public/app.js     Animation engine, routing, rendering
+public/app.js     Scroll-driven story engine, zoom, packet popovers
 public/topics.js  All topic content (TOPICS, GROUPS)
 test/             node:test: server.test.js spawns the server with PORT=0;
                   topics.test.js validates the content

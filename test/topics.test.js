@@ -7,6 +7,7 @@ import { TOPICS, GROUPS } from '../public/topics.js';
 
 const ids = Object.keys(TOPICS);
 const KINDS = new Set(['p', 'e', 'x', 'l']);
+const ICONS = new Set(['laptop', 'server', 'book', 'globe', 'drawers', 'doc', 'seal', 'hood', 'bank']);
 const linksIn = (html) => [...html.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]);
 
 test('topic ids are simple slugs', () => {
@@ -47,6 +48,7 @@ test('animated topics are well formed', () => {
       assert.ok(!actors.has(a.id), `${id}: duplicate actor "${a.id}"`);
       actors.add(a.id);
       assert.ok(a.l, `${id}/${a.id}: label required`);
+      assert.ok(ICONS.has(a.icon), `${id}/${a.id}: icon must be one of ${[...ICONS].join(', ')}`);
       for (const k of ['x', 'y']) assert.ok(a[k] >= 0 && a[k] <= 100, `${id}/${a.id}: ${k} must be 0–100`);
     }
     for (const [a, b] of t.links ?? []) assert.ok(actors.has(a) && actors.has(b), `${id}: link ${a}–${b} names an unknown actor`);
@@ -55,11 +57,16 @@ test('animated topics are well formed', () => {
       const where = `${id} step ${i + 1}`;
       assert.ok(s.t && s.d, `${where}: title (t) and narration (d) are required`);
       for (const m of s.m ?? []) {
-        const [from, to, label, kind = 'p'] = m;
+        const [from, to, label, kind = 'p', inside] = m;
+        if (inside !== undefined) assert.equal(typeof inside, 'string', `${where}: packet contents must be text`);
         assert.ok(actors.has(from) && actors.has(to), `${where}: message ${from}→${to} names an unknown actor`);
         assert.notEqual(from, to, `${where}: message to itself`);
         assert.ok(label, `${where}: message needs a label`);
         assert.ok(KINDS.has(kind), `${where}: unknown message kind "${kind}"`);
+      }
+      if (s.zoom !== undefined) {
+        assert.ok(TOPICS[s.zoom], `${where}: zooms into unknown topic "${s.zoom}"`);
+        assert.notEqual(s.zoom, id, `${where}: zooms into itself`);
       }
       for (const a of s.on ?? []) assert.ok(actors.has(a), `${where}: "on" names unknown actor "${a}"`);
       for (const a of Object.keys(s.b ?? {})) assert.ok(actors.has(a), `${where}: badge on unknown actor "${a}"`);

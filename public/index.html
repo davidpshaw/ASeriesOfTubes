@@ -7,34 +7,21 @@
 <link rel="stylesheet" href="app.css">
 <script type="module" src="app.js"></script>
 </head><body>
-<header class="top"><a class="brand" href="#journey">A Series of <span>Tubes</span></a><p>How the internet actually works. (Spoiler: it isn’t tubes.)</p></header>
-<div class="app">
-<nav class="side" aria-label="Topics"><input id="find" type="search" placeholder="Find a topic" aria-label="Find a topic"><div id="groups"></div></nav>
-<main>
- <div class="crumb" id="crumb"></div>
- <h1 id="title">Loading</h1>
- <p class="lead" id="lead"></p>
- <section id="anim">
-  <div class="stage">
-   <div class="fig"><svg id="scene" role="img" aria-label="Animated diagram of the current step"></svg></div>
-   <div class="legend"><span><i></i>Readable by anyone on the path</span><span><i class="e"></i>Encrypted</span><span><i class="x"></i>Forged or attacker</span><span><i class="l"></i>Lost</span></div>
-   <div class="ctl">
-    <button id="prev" aria-label="Previous step">&larr;</button>
-    <button id="play" class="pri">Play</button>
-    <button id="next" aria-label="Next step">&rarr;</button>
-    <button id="replay">Replay step</button>
-    <button id="speed" aria-label="Animation speed">1&times;</button>
-    <div class="dots" id="dots"></div>
-   </div>
+<header class="top">
+ <a class="brand" href="#journey">A Series of <span>Tubes</span></a>
+ <nav class="trail" id="trail" aria-label="Where you are"></nav>
+ <details class="menu" id="menu"><summary>All topics</summary><div class="menu-list" id="menuList"></div></details>
+</header>
+<main class="story">
+ <div class="scene-wrap">
+  <div class="scene" id="scene">
+   <svg id="svg" role="img" aria-label="Animated diagram of the current step"></svg>
+   <div class="soonmsg" id="soonmsg" hidden><p>This topic isn’t animated yet.</p><p>Its outline is in the captions.</p></div>
   </div>
-  <div class="below">
-   <div class="step" id="step" aria-live="polite"></div>
-   <div class="deeper" id="deeper"></div>
-  </div>
-  <div class="term" id="term"></div>
- </section>
- <section id="soon" class="soon" hidden></section>
+  <button class="backout" id="back" hidden></button>
+  <div class="pop" id="pop" role="dialog" aria-live="polite" hidden></div>
+ </div>
+ <div class="captions" id="captions"></div>
 </main>
-</div>
-<footer>Prototype. Terminal output is sample output, trimmed, and uses documentation IP ranges (203.0.113.x, 198.51.100.x). Use the arrow keys to step and the space bar to play or pause. Topics live in topics.js; see the README to add one.</footer>
+<footer>Sample commands and output use documentation addresses (203.0.113.x, 198.51.100.x). Scroll to step through a topic, or use ← and →. Tap a postcard or envelope to look inside. Esc backs out of a zoom.</footer>
 </body></html>
