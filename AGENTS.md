@@ -57,6 +57,13 @@ is a nod to the 2006 "series of tubes" description of the internet.
   below it show as passed) or `'all'`. Ticks appear one at a time, `who` lights
   up the actor that vouches, links go solid as each card passes, and a failing
   check (`ok: false`) breaks the chain. On phones the panel replaces the scene.
+- Paint pots (Key exchange): a step's `pots: {actorId: [[color, label, flag]]}`
+  draws a labelled row of paint pots under an actor (`flag` 'lock' = kept
+  secret, 'gone' = thrown away); `mix: {actorId: [i, j, [color, label]]}`
+  animates pots i and j being stirred into a new pot. A message's optional 6th
+  field puts a paint swatch on the packet. Every pot has a text label so color
+  is never the only clue. Colors: yellow, red, blue, orange, green, brown.
+- Use American spelling ("color", "gray").
 - `npm test` validates every topic (actors, messages, links, groups). Keep it
   passing; extend `test/topics.test.js` when the topic format grows.
 

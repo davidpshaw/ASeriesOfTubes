@@ -23,10 +23,11 @@ const ICONS = {
   doc: '<path d="M6 3h8.5L19 7.5V21H6z"/><path d="M14.5 3v4.5H19M9 12h7M9 16h7"/>',
   seal: '<circle cx="12" cy="9" r="5.5"/><path d="M9 13.8 7.5 21l4.5-2.6 4.5 2.6-1.5-7.2"/>',
   hood: '<path d="M12 3a6.5 6.5 0 0 0-6.5 6.5v2.5a6.5 6.5 0 0 0 13 0V9.5A6.5 6.5 0 0 0 12 3z"/><path d="M4 21c1.2-3.6 4.2-5.4 8-5.4s6.8 1.8 8 5.4M9 11.5h6"/>',
+  bandit: '<path d="M4.5 8.5h15M8 8.5V6.2a4 4 0 0 1 8 0v2.3"/><circle cx="12" cy="14.5" r="5.5"/><path class="f" d="M6 12.6h12v3H6z"/><circle class="h" cx="9.7" cy="14.1" r="1.1"/><circle class="h" cx="14.3" cy="14.1" r="1.1"/><path d="M18 13.2l2.5-1.6M18 14.6l2.5 1.4"/>',
   bank: '<path d="M3 9.5 12 4l9 5.5z"/><path d="M5.5 9.5v8.5M10 9.5v8.5M14 9.5v8.5M18.5 9.5v8.5M3 20.5h18"/>',
 };
 
-let cur = null, curId = '', active = -2, step = -1, done = 0, pkt = null, token = 0, busy = false, pageStage = 0, chainPos = 0;
+let cur = null, curId = '', active = -2, step = -1, done = 0, pkt = null, token = 0, busy = false, pageStage = 0, chainPos = 0, mixT = 1;
 let trail = []; // ancestors: {id, step, origin}
 let cards = [];
 let seen = {};
@@ -72,7 +73,7 @@ function labelOffset(g, lane, mini) {
 function labelPos(g, s, mx, my, m, lane, mini, numbered) {
   const off = labelOffset(g, lane, mini), dir = s.sign;
   if (Math.abs(s.n.y) >= 0.35) return { x: mx, y: my + Math.sign(s.n.y) * dir * off };
-  const w = mini ? 32 : m[2].length * 8.1 + 24 + (numbered ? 24 : 0) + ((m[3] || 'p') === 'e' ? 8 : 46);
+  const w = mini ? 32 : m[2].length * 8.1 + 24 + (numbered ? 24 : 0) + (m[5] ? 20 : 0) + ((m[3] || 'p') === 'e' ? 8 : 46);
   const side = Math.sign(s.n.x) * dir || 1, h = mini ? 24 : 46;
   return { x: mx + side * (w / 2 + 16), y: my + (lane - 0.5) * h * (lane ? 1 : 0) };
 }
@@ -81,9 +82,10 @@ const lanesOf = (ms) => ms.map((m, i) => ms.slice(0, i).filter((x) => x[0] === m
 
 function chip(x, y, m, i, W, opts = {}) {
   const { fly = false, mini = false, num = 0, land = false } = opts;
-  const label = m[2], k = m[3] || 'p', env = k === 'e';
-  const numW = num && !mini ? 24 : 0;
+  const label = m[2], k = m[3] || 'p', env = k === 'e', sw = !mini && m[5] ? 20 : 0;
+  const numW = (num && !mini ? 24 : 0) + sw;
   const w = mini ? 32 : Math.round(label.length * 8.1 + 24 + numW + (env ? 8 : 46)), h = mini ? 20 : 38;
+  const mini2 = mini && m[5] ? `<circle class="swatch" cx="${w - 8}" cy="${h / 2}" r="5" fill="${PAINT[m[5]] || m[5]}"/>` : '';
   x = Math.max(w / 2 + 4, Math.min(W - w / 2 - 4, x));
   let body;
   if (mini) {
@@ -102,10 +104,12 @@ function chip(x, y, m, i, W, opts = {}) {
       + `<path class="house" d="M${sx + 5.5} 18l6-5 6 5v7h-12z"/>`;
   }
   const ty = env ? 31 : 24.5;
-  const badge = numW ? `<circle class="num" cx="16" cy="${env ? 26 : 19}" r="9"/><text class="numt" x="16" y="${(env ? 26 : 19) + 4.5}">${num}</text>` : '';
+  const by = env ? 26 : 19, nx = sw ? 36 : 16;
+  let badge = num && !mini ? `<circle class="num" cx="${nx}" cy="${by}" r="9"/><text class="numt" x="${nx}" y="${by + 4.5}">${num}</text>` : '';
+  if (sw) badge += `<circle class="swatch" cx="16" cy="${by}" r="8" fill="${PAINT[m[5]] || m[5]}"/>`;
   const text = mini ? `<title>${esc(label)}</title>${num ? `<text class="mnum" x="${env ? w / 2 : 11}" y="${env ? 17.5 : 14.5}">${num}</text>` : ''}` : `<text class="ct" x="${12 + numW}" y="${ty}">${esc(label)}</text>`;
   const ring = land ? `<rect class="ring" x="-3" y="-3" width="${w + 6}" height="${h + 6}" rx="6"/>` : '';
-  return `<g class="chip k${k}${fly ? ' fly' : ''}${mini ? ' mini' : ''}" data-m="${i}" transform="translate(${x - w / 2},${y - h / 2})" aria-label="${esc(label)}: look inside">${ring}${body}${badge}${text}</g>`;
+  return `<g class="chip k${k}${fly ? ' fly' : ''}${mini ? ' mini' : ''}" data-m="${i}" transform="translate(${x - w / 2},${y - h / 2})" aria-label="${esc(label)}: look inside">${ring}${body}${badge}${mini2}${text}</g>`;
 }
 const zoomActor = (st) => (st && (st.m?.[0]?.[1] || st.on?.[0])) || null;
 
@@ -136,7 +140,7 @@ function draw() {
     const p = g.P[a.id], bd = st?.b?.[a.id];
     const half = Math.max(a.l.length * 3.8, (a.term && !g.small ? a.term.length * 3.3 : 0), (bd ? bd.length * 3.6 : 0)) + 4;
     const dx = Math.max(half, Math.min(g.W - half, p.x)) - p.x;
-    h += `<g class="node${on.has(a.id) ? ' on' : ''}${a.icon === 'hood' ? ' bad' : ''}${st?.page && st.page !== a.id ? ' dim' : ''}" transform="translate(${p.x},${p.y})">`
+    h += `<g class="node${on.has(a.id) ? ' on' : ''}${a.icon === 'hood' || a.icon === 'bandit' ? ' bad' : ''}${st?.page && st.page !== a.id ? ' dim' : ''}" transform="translate(${p.x},${p.y})">`
       + `<circle class="halo" r="${g.r + 5}"/><circle class="disc" r="${g.r}"/>`
       + `<g class="ico" transform="translate(${-12 * sc},${-12 * sc}) scale(${sc})">${ICONS[a.icon] || ICONS.server}</g>`
       + `<text class="lb" x="${dx}" y="${g.r + 18}">${esc(a.l)}</text>`
@@ -144,6 +148,7 @@ function draw() {
       + (bd ? `<text class="bd" x="${dx}" y="${g.r + (a.term && !g.small ? 50 : 34)}">${esc(bd)}</text>` : '')
       + '</g>';
   }
+  if (!hideScene) for (const a of cur.actors) h += potsFor(g, a, st);
   if (st?.zoom && TOPICS[st.zoom]) {
     const z = g.P[zoomActor(st)] || { x: g.W / 2, y: g.H / 2 };
     h += `<g class="zb" data-zoom="${st.zoom}" role="button" aria-label="Zoom into ${esc(nameOf(st.zoom))}" transform="translate(${z.x + g.r * 0.85},${z.y - g.r * 0.85})"><circle r="13"/><path d="M-5 0h10M0-5v10"/></g>`;
@@ -165,14 +170,55 @@ function draw() {
   }
   // Until someone has opened a packet once, point at the newest one.
   if (!peeked && hintAt && !hideScene) {
-    const txt = g.small ? 'Tap to look inside' : 'Click to look inside', bw = txt.length * 7.6 + 24, by = hintAt.y - 10 - 30;
-    h += `<g class="hint" transform="translate(${hintAt.x - bw / 2},${by})"><rect width="${bw}" height="30" rx="15"/><path d="M${bw / 2 - 7} 29.5l7 8 7-8z"/><text x="${bw / 2}" y="20">${txt}</text></g>`;
+    const txt = g.small ? 'Tap to look inside' : 'Click to look inside', bw = txt.length * 7.6 + 24;
+    const above = hintAt.y - 10 - 30, flip = above < 6 + g.inset, by = flip ? hintAt.y + 38 + 10 : above;
+    const tip = flip ? `<path d="M${bw / 2 - 7} 0.5l7 -8 7 8z"/>` : `<path d="M${bw / 2 - 7} 29.5l7 8 7-8z"/>`;
+    h += `<g class="hint" transform="translate(${hintAt.x - bw / 2},${by})"><rect width="${bw}" height="30" rx="15"/>${tip}<text x="${bw / 2}" y="20">${txt}</text></g>`;
   }
   svg.innerHTML = h;
 }
 
+/* ---------- paint pots (step fields `pots` and `mix`) ----------
+   pots: {actorId: [[colour, label, flag]]}  flag: 'lock' (kept secret) or 'gone' (thrown away)
+   mix:  {actorId: [i, j, [colour, label]]}  animates pots i and j being mixed into a new pot */
+export const PAINT = { yellow: '#f2c230', red: '#d8453b', blue: '#3b6fd8', orange: '#ef8c2d', green: '#3f9c5c', brown: '#7b4f2c' };
+function potsFor(g, a, st) {
+  const base = st?.pots?.[a.id];
+  if (!base) return '';
+  const mix = st.mix?.[a.id], p = g.P[a.id], total = base.length + (mix ? 1 : 0);
+  const pr = g.small ? 9 : 12, gap = g.small ? 42 : 46, perRow = g.small ? 3 : 6, rowH = pr * 2 + 26;
+  const bd = st?.b?.[a.id], below = g.r + (a.term && !g.small ? 50 : 34) + (bd ? 18 : 0);
+  const y0 = p.y + below + pr + 4;
+  // Rows stay inside the scene: on phones they wrap after three pots, and a row near an edge shifts inward.
+  const slot = (k) => {
+    const row = Math.floor(k / perRow), col = k % perRow, inRow = Math.min(perRow, total - row * perRow);
+    const half = ((inRow - 1) / 2) * gap + 30, cx = Math.max(half + 4, Math.min(g.W - half - 4, p.x));
+    return { x: cx + (col - (inRow - 1) / 2) * gap, y: y0 + row * rowH };
+  };
+  const pot = (k, colour, label, flag, opacity = 1) => {
+    const c = slot(k);
+    let h = `<g class="pot${flag === 'gone' ? ' gone' : ''}" opacity="${opacity}"><circle cx="${c.x}" cy="${c.y}" r="${pr}" fill="${PAINT[colour] || colour}"/>`;
+    if (flag === 'lock') h += `<g class="potlock" transform="translate(${c.x + pr * 0.75},${c.y - pr * 0.85})"><circle r="6.5"/><rect x="-3" y="-0.8" width="6" height="4.6" rx=".8"/><path d="M-1.7 -0.8v-1.4a1.7 1.7 0 0 1 3.4 0v1.4"/></g>`;
+    return h + `<text class="potl" x="${c.x}" y="${c.y + pr + 13}">${esc(label)}</text></g>`;
+  };
+  let h = '';
+  base.forEach(([colour, label, flag], k) => { h += pot(k, colour, label, flag); });
+  if (mix) {
+    const [i, j, [colour, label]] = mix, to = slot(total - 1), t = mixT;
+    if (t < 1) {
+      // copies of the two pots slide together into the new slot, then become the mixture
+      for (const k of [i, j]) {
+        const from = slot(k), e = t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2;
+        h += `<circle class="ghost" cx="${from.x + (to.x - from.x) * e}" cy="${from.y + (to.y - from.y) * e + Math.sin(Math.PI * e) * 20}" r="${pr * 0.85}" fill="${PAINT[base[k][0]]}" opacity="${t > 0.75 ? (1 - t) * 4 : 1}"/>`;
+      }
+    }
+    if (t > 0.7) h += pot(total - 1, colour, label, null, Math.min(1, (t - 0.7) / 0.3));
+  }
+  return h;
+}
+
 /* ---------- a browser page that builds itself (step field `page`) ---------- */
-const PAGE_STAGES = ['', 'Structure, from the HTML', 'Colours and layout, from style.css', 'The picture, from logo.png', 'Page loaded'];
+const PAGE_STAGES = ['', 'Structure, from the HTML', 'Colors and layout, from style.css', 'The picture, from logo.png', 'Page loaded'];
 function browserPage(g, at, stage, warn) {
   const w = Math.min(360, g.W * (g.small ? 0.72 : 0.6)), hh = w * 0.68;
   let x = Math.max(at.x + g.r + 28, g.W / 2 - w / 2 + 20);
@@ -293,9 +339,9 @@ function fly(i, tok) {
 }
 async function run(i, instant) {
   const tok = ++token;
-  step = i; done = 0; pkt = null; pageStage = 0; chainPos = 0;
+  step = i; done = 0; pkt = null; pageStage = 0; chainPos = 0; mixT = cur.steps[i].mix ? 0 : 1;
   const st = cur.steps[i], ms = st.m || [], chainLen = st.chain ? chainRange(st.chain).list.length : 0;
-  if (instant || RM.matches) { done = ms.length; pageStage = 4; chainPos = chainLen; draw(); return; }
+  if (instant || RM.matches) { done = ms.length; pageStage = 4; chainPos = chainLen; mixT = 1; draw(); return; }
   draw();
   await wait(200);
   for (let k = 0; k < ms.length; k++) {
@@ -304,6 +350,21 @@ async function run(i, instant) {
     if (tok !== token) return;
     pkt = null; done = k + 1; landedAt = performance.now(); draw();
     await wait(300);
+  }
+  if (st.mix) {
+    await wait(500);
+    if (tok !== token) return;
+    await new Promise((res) => {
+      const t0 = performance.now();
+      const f = (now) => {
+        if (tok !== token) return res();
+        mixT = Math.min(1, (now - t0) / 1400);
+        draw();
+        mixT < 1 ? requestAnimationFrame(f) : res();
+      };
+      requestAnimationFrame(f);
+    });
+    if (tok !== token) return;
   }
   for (let k = 1; k <= chainLen; k++) {
     await wait(k === 1 ? 500 : 950);
@@ -334,9 +395,9 @@ function activate(i, instant) {
   for (const c of cards) c.classList.toggle('on', +c.dataset.i === i);
   if (!cur.steps) return;
   const n = cur.steps.length;
-  if (i < 0) { token++; step = -1; done = 0; pkt = null; draw(); }
+  if (i < 0) { token++; step = -1; done = 0; pkt = null; mixT = 1; draw(); }
   else if (i >= n) {
-    token++; step = n - 1; done = (cur.steps[n - 1].m || []).length; pageStage = 4; pkt = null;
+    token++; step = n - 1; done = (cur.steps[n - 1].m || []).length; pageStage = 4; pkt = null; mixT = 1;
     chainPos = cur.steps[n - 1].chain ? chainRange(cur.steps[n - 1].chain).list.length : 0;
     draw();
   }

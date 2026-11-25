@@ -7,7 +7,8 @@ import { TOPICS, GROUPS } from '../public/topics.js';
 
 const ids = Object.keys(TOPICS);
 const KINDS = new Set(['p', 'e', 'x', 'l']);
-const ICONS = new Set(['laptop', 'server', 'book', 'globe', 'drawers', 'doc', 'seal', 'hood', 'bank']);
+const ICONS = new Set(['laptop', 'server', 'book', 'globe', 'drawers', 'doc', 'seal', 'hood', 'bandit', 'bank']);
+const PAINTS = new Set(['yellow', 'red', 'blue', 'orange', 'green', 'brown']);
 // Every abbreviation must be spelled out at its first use in each topic, e.g. "Domain Name System (DNS)".
 const ACRONYMS = {
   ACK: 'acknowledge', ACME: 'Automatic Certificate Management Environment', ASLR: 'address space layout randomization',
@@ -129,6 +130,29 @@ test('chains of trust are well formed', () => {
           assert.equal(typeof ok, 'boolean', `${where}: check "${text}" ok must be true or false`);
           if (who !== undefined) assert.ok(actors.has(who), `${where}: check "${text}" names unknown actor "${who}"`);
         }
+      }
+    });
+  }
+});
+
+test('paint pots, mixing and swatches are well formed', () => {
+  for (const [id, t] of Object.entries(TOPICS)) {
+    const actors = new Set((t.actors ?? []).map((a) => a.id));
+    (t.steps ?? []).forEach((s, i) => {
+      const where = `${id} step ${i + 1}`;
+      for (const m of s.m ?? []) if (m[5] !== undefined) assert.ok(PAINTS.has(m[5]), `${where}: unknown paint "${m[5]}"`);
+      for (const [a, pots] of Object.entries(s.pots ?? {})) {
+        assert.ok(actors.has(a), `${where}: pots for unknown actor "${a}"`);
+        for (const [color, label, flag] of pots) {
+          assert.ok(PAINTS.has(color), `${where}: unknown paint "${color}"`);
+          assert.ok(label, `${where}: every pot needs a label, so color is never the only clue`);
+          assert.ok(flag === undefined || flag === 'lock' || flag === 'gone', `${where}: pot flag must be 'lock' or 'gone'`);
+        }
+      }
+      for (const [a, [pi, pj, made]] of Object.entries(s.mix ?? {})) {
+        const pots = s.pots?.[a] ?? [];
+        assert.ok(pots[pi] && pots[pj], `${where}: mix for "${a}" names pots that don't exist`);
+        assert.ok(PAINTS.has(made?.[0]) && made?.[1], `${where}: mix for "${a}" needs a result color and label`);
       }
     });
   }
