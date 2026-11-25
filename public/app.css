@@ -133,6 +133,23 @@ h1{font-size:clamp(32px,4vw,46px);line-height:1.05;margin:6px 0 12px;text-wrap:b
 .page .ptext{fill:var(--mute);opacity:.55}
 .page .ppic rect{fill:#9cc4de}.page .ppic circle{fill:#f5c542}.page .ppic path{fill:#4f7d5a}
 .page .pdone circle{fill:var(--ink)}.page .pdone path{fill:none;stroke:var(--panel);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.page .pwarn{fill:var(--brick)}.page .pwarnx{stroke:#fff;stroke-width:3.2;stroke-linecap:round}
+.page .pwarnt{font:700 15px var(--sans);fill:var(--ink);text-anchor:middle}
+.page .pbtn{fill:var(--ink)}
+.chain .ccard{fill:var(--panel);stroke:var(--line);stroke-width:1.5}
+.chain .ccard.cur{stroke:var(--brick);stroke-width:2.2}
+.chain .ccard.ok{stroke:var(--ink);stroke-width:1.6}
+.chain .ccard.bad{stroke:var(--brick);stroke-width:2.4;fill:var(--tint)}
+.chain .cname{font:700 15px var(--sans);fill:var(--ink)}
+.chain .ctext{font:14px var(--sans);fill:var(--ink)}.chain .ctext.wait{fill:var(--mute);opacity:.6}.chain .ctext.no{fill:var(--brick);font-weight:700}
+.chain .ctick circle{fill:var(--ink)}.chain .ctick path{fill:none;stroke:var(--panel);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.chain .ccross circle{fill:var(--brick)}.chain .ccross path{stroke:#fff;stroke-width:2.2;stroke-linecap:round}
+.chain .cpend{fill:none;stroke:var(--line);stroke-width:1.6}
+.chain .clink rect{fill:none;stroke-width:3}.chain .clink.ok rect{stroke:var(--ink)}.chain .clink.wait rect{stroke:var(--line);stroke-dasharray:3 3}.chain .clink.bad rect{stroke:var(--brick)}
+.chain .clink.bad rect:last-child{transform:translate(0,6px)}
+.chain .cverdict text{font:700 15px var(--sans)}.chain .cverdict.ok text{fill:var(--ink)}.chain .cverdict.bad text{fill:var(--brick)}
+.lockb circle{fill:var(--ink)}.lockb rect{fill:var(--panel)}.lockb path{fill:none;stroke:var(--panel);stroke-width:1.8;stroke-linecap:round}
+.lockb.bad circle{fill:var(--brick)}.lockb.bad path{stroke:#fff;stroke-width:2.4}
 .page .pstage{font:700 14px var(--sans);fill:var(--brick);text-anchor:middle}
 .zb{cursor:pointer}.zb circle{fill:var(--brick)}.zb path{stroke:#fff;stroke-width:2.4;stroke-linecap:round}
 .zb:hover circle{fill:var(--ink)}

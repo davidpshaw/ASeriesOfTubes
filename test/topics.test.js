@@ -22,7 +22,8 @@ const ACRONYMS = {
 };
 const plain = (html) => html.replace(/<[^>]+>/g, '');
 // The words a reader meets, in order: title, blurb, each step's title and caption, then the closing card.
-const readingText = (t) => [t.title, t.blurb, ...(t.steps ?? []).flatMap((s) => [s.t, plain(s.d)]),
+const chainText = (c) => (c ? c.cards.flatMap((k) => [k.name, ...k.checks.map((x) => x[0])]) : []);
+const readingText = (t) => [t.title, t.blurb, ...(t.steps ?? []).flatMap((s) => [s.t, plain(s.d), ...chainText(s.chain)]),
   ...(t.plan ?? []), ...(t.deeper ?? []).map(([, why]) => why), t.note ?? ''].join('\n');
 const linksIn = (html) => [...html.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]);
 
@@ -110,5 +111,25 @@ test('page drawings name a real actor', () => {
     for (const s of t.steps ?? []) {
       if (s.page !== undefined) assert.ok(t.actors.some((a) => a.id === s.page), `${id}: page drawn at unknown actor "${s.page}"`);
     }
+  }
+});
+
+test('chains of trust are well formed', () => {
+  for (const [id, t] of Object.entries(TOPICS)) {
+    (t.steps ?? []).forEach((s, i) => {
+      if (!s.chain) return;
+      const where = `${id} step ${i + 1}`, c = s.chain, actors = new Set(t.actors.map((a) => a.id));
+      assert.ok(actors.has(c.at), `${where}: chain checked by unknown actor "${c.at}"`);
+      assert.ok(Array.isArray(c.cards) && c.cards.length > 0, `${where}: chain needs cards`);
+      assert.ok(c.check === 'all' || (Number.isInteger(c.check) && c.check >= 0 && c.check < c.cards.length), `${where}: chain.check must be 'all' or a card index`);
+      for (const card of c.cards) {
+        assert.ok(card.name && card.checks?.length, `${where}: each card needs a name and checks`);
+        for (const [text, ok = true, who] of card.checks) {
+          assert.ok(text, `${where}: empty check on ${card.name}`);
+          assert.equal(typeof ok, 'boolean', `${where}: check "${text}" ok must be true or false`);
+          if (who !== undefined) assert.ok(actors.has(who), `${where}: check "${text}" names unknown actor "${who}"`);
+        }
+      }
+    });
   }
 });

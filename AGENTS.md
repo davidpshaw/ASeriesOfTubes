@@ -49,7 +49,14 @@ is a nod to the 2006 "series of tubes" description of the internet.
   (encrypted), `x` forged/attacker, `l` lost. Keep labels short; put the full
   contents in the optional 5th field.
 - A step's `page: actorId` draws a browser window next to that actor and builds
-  it in stages (HTML structure, then styles, then image, then done).
+  it in stages (HTML structure, then styles, then image, then done). Add
+  `warn: true` to draw the browser's certificate warning page instead.
+- A step's `chain: {at, cards, check}` draws the chain-of-trust panel: stacked
+  certificate cards from the site (`cards[0]`) up to the root, each with checks
+  `[text, ok = true, who]`. `check` is the card being checked this step (cards
+  below it show as passed) or `'all'`. Ticks appear one at a time, `who` lights
+  up the actor that vouches, links go solid as each card passes, and a failing
+  check (`ok: false`) breaks the chain. On phones the panel replaces the scene.
 - `npm test` validates every topic (actors, messages, links, groups). Keep it
   passing; extend `test/topics.test.js` when the topic format grows.
 

@@ -72,6 +72,8 @@ heading in `GROUPS`:
       m: [ ['a', 'b', 'hello', 'p', 'Full text shown when tapped'], ['b', 'a', 'hi', 'e'] ],  // from, to, label, kind, inside
       on: ['a'], b: { b: 'badge under b' }, zoom: 'tls' },     // zoom: topic this step opens into
     { t: 'Last step', d: '…', page: 'a' },                     // page: draw a browser page building itself next to actor a
+    // chain: { at: 'a', check: 0, cards: [{ name: 'www.example.com', checks: [['In date'], ['Signed by …', true, 'b']] }, …] }
+    //   draws a chain-of-trust panel that ticks off each check (see the Certificates topic)
   ],
   deeper: [ ['tls', 'Why this links to TLS'] ],
   cmd: 'the command', out: 'sample output', note: 'What to look for in the output.',

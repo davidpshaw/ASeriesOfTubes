@@ -26,7 +26,7 @@ const ICONS = {
   bank: '<path d="M3 9.5 12 4l9 5.5z"/><path d="M5.5 9.5v8.5M10 9.5v8.5M14 9.5v8.5M18.5 9.5v8.5M3 20.5h18"/>',
 };
 
-let cur = null, curId = '', active = -2, step = -1, done = 0, pkt = null, token = 0, busy = false, pageStage = 0;
+let cur = null, curId = '', active = -2, step = -1, done = 0, pkt = null, token = 0, busy = false, pageStage = 0, chainPos = 0;
 let trail = []; // ancestors: {id, step, origin}
 let cards = [];
 let seen = {};
@@ -54,6 +54,15 @@ function seg(m, g, lane = 0) {
 function labelOffset(g, lane, mini) {
   if (g.small) return 12 + lane * 24 + (mini ? 0 : 12);
   return 32 + lane * 46;
+}
+// Where a packet's label goes. Labels are wide and short, so on sloped lines they stack straight up or
+// down (never along the slope, where they would collide); beside near-vertical lines they sit to the side.
+function labelPos(g, s, mx, my, m, lane, mini, numbered) {
+  const off = labelOffset(g, lane, mini), dir = s.sign;
+  if (Math.abs(s.n.y) >= 0.35) return { x: mx, y: my + Math.sign(s.n.y) * dir * off };
+  const w = mini ? 32 : m[2].length * 8.1 + 24 + (numbered ? 24 : 0) + ((m[3] || 'p') === 'e' ? 8 : 46);
+  const side = Math.sign(s.n.x) * dir || 1, h = mini ? 24 : 46;
+  return { x: mx + side * (w / 2 + 16), y: my + (lane - 0.5) * h * (lane ? 1 : 0) };
 }
 // Lane = how many earlier messages in this step went the same way between the same two actors.
 const lanesOf = (ms) => ms.map((m, i) => ms.slice(0, i).filter((x) => x[0] === m[0] && x[1] === m[1]).length);
@@ -91,21 +100,24 @@ function draw() {
   if (!cur || !cur.steps || !svg.clientWidth) { svg.innerHTML = ''; return; }
   const g = geo(), st = step >= 0 ? cur.steps[step] : null, ms = st?.m || [], on = new Set(st?.on || []);
   ms.forEach((m) => { on.add(m[0]); on.add(m[1]); });
+  const ch = st?.chain ? chainState(st.chain, chainPos) : null;
+  if (ch?.who) on.add(ch.who);
+  if (ch) on.add(st.chain.at);
   let h = '<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0 0L10 5L0 10z"/></marker><marker id="ahb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ahb" d="M0 0L10 5L0 10z"/></marker></defs>';
-  for (const [a, b] of cur.links || []) h += `<line class="lnk${st?.page ? ' dim' : ''}" x1="${g.P[a].x}" y1="${g.P[a].y}" x2="${g.P[b].x}" y2="${g.P[b].y}"/>`;
+  const hideScene = g.small && ch;
+  if (!hideScene) for (const [a, b] of cur.links || []) h += `<line class="lnk${st?.page ? ' dim' : ''}" x1="${g.P[a].x}" y1="${g.P[a].y}" x2="${g.P[b].x}" y2="${g.P[b].y}"/>`;
   let chips = '';
   const lanes = lanesOf(ms), numbered = ms.length > 1;
-  ms.slice(0, done).forEach((m, i) => {
+  (hideScene ? [] : ms.slice(0, done)).forEach((m, i) => {
     const s = seg(m, g, lanes[i]), k = m[3] || 'p', lost = k === 'l';
     const ex = lost ? s.x1 + (s.x2 - s.x1) * 0.55 : s.x2, ey = lost ? s.y1 + (s.y2 - s.y1) * 0.55 : s.y2;
     h += `<line class="tr k${k}" x1="${s.x1}" y1="${s.y1}" x2="${ex}" y2="${ey}"${lost ? '' : ` marker-end="url(#${k === 'x' ? 'ahb' : 'ah'})"`}/>`;
     if (lost) h += `<path class="tr kx" d="M${ex - 6} ${ey - 6}l12 12M${ex + 6} ${ey - 6}l-12 12" stroke-width="2.5"/>`;
-    // On narrow screens only the newest packet keeps its label; earlier ones shrink (still tappable).
-    const mini = g.small, off = s.sign * labelOffset(g, lanes[i], mini);
-    chips += chip((s.x1 + ex) / 2 + s.n.x * off, (s.y1 + ey) / 2 + s.n.y * off, m, i, g.W, { mini, num: numbered ? i + 1 : 0 });
+    const mini = g.small, p = labelPos(g, s, (s.x1 + ex) / 2, (s.y1 + ey) / 2, m, lanes[i], mini, numbered);
+    chips += chip(p.x, p.y, m, i, g.W, { mini, num: numbered ? i + 1 : 0 });
   });
   const sc = g.r / 21;
-  for (const a of cur.actors) {
+  for (const a of hideScene ? [] : cur.actors) {
     const p = g.P[a.id], bd = st?.b?.[a.id];
     const half = Math.max(a.l.length * 3.8, (a.term && !g.small ? a.term.length * 3.3 : 0), (bd ? bd.length * 3.6 : 0)) + 4;
     const dx = Math.max(half, Math.min(g.W - half, p.x)) - p.x;
@@ -122,8 +134,9 @@ function draw() {
     h += `<g class="zb" data-zoom="${st.zoom}" role="button" aria-label="Zoom into ${esc(nameOf(st.zoom))}" transform="translate(${z.x + g.r * 0.85},${z.y - g.r * 0.85})"><circle r="13"/><path d="M-5 0h10M0-5v10"/></g>`;
   }
   h += chips;
-  if (st?.page && g.P[st.page]) h += browserPage(g, g.P[st.page], pageStage);
-  if (pkt && ms[pkt.i]) {
+  if (ch) h += chainPanel(g, st.chain, ch);
+  if (st?.page && g.P[st.page]) h += browserPage(g, g.P[st.page], pageStage, st.warn);
+  if (pkt && ms[pkt.i] && !hideScene) {
     const m = ms[pkt.i], s = seg(m, g, lanes[pkt.i]), t = pkt.t, k = m[3] || 'p';
     const op = k === 'l' && t > 0.5 ? Math.max(0, 1 - (t - 0.5) * 4) : 1;
     h += `<g opacity="${op}">${chip(s.x1 + (s.x2 - s.x1) * t, s.y1 + (s.y2 - s.y1) * t, m, pkt.i, g.W, { fly: true, mini: g.small, num: numbered ? pkt.i + 1 : 0 })}</g>`;
@@ -136,7 +149,7 @@ function draw() {
 
 /* ---------- a browser page that builds itself (step field `page`) ---------- */
 const PAGE_STAGES = ['', 'Structure, from the HTML', 'Colours and layout, from style.css', 'The picture, from logo.png', 'Page loaded'];
-function browserPage(g, at, stage) {
+function browserPage(g, at, stage, warn) {
   const w = Math.min(360, g.W * (g.small ? 0.72 : 0.6)), hh = w * 0.68;
   let x = Math.max(at.x + g.r + 28, g.W / 2 - w / 2 + 20);
   x = Math.min(x, g.W - w - 10);
@@ -152,6 +165,15 @@ function browserPage(g, at, stage) {
   h += `<rect class="paddr" x="${x + 46}" y="${y + 6}" width="${w - 56}" height="15" rx="7.5"/>`;
   h += `<g class="plock" transform="translate(${x + 53},${y + 8})"><rect y="4.5" width="8" height="6.5" rx="1"/><path d="M1.8 5V3.4a2.2 2.2 0 0 1 4.4 0V5"/></g>`;
   if (w > 220) h += `<text class="paddrt" x="${x + 66}" y="${y + 17.5}">https://www.example.com/</text>`;
+  if (warn && stage >= 1) {
+    const cx = x + w / 2, ty = top + hh * 0.08;
+    h += `<path class="pwarn" d="M${cx} ${ty}l${hh * 0.17} ${hh * 0.3}h${-hh * 0.34}z"/><path class="pwarnx" d="M${cx} ${ty + hh * 0.1}v${hh * 0.1}M${cx} ${ty + hh * 0.25}v.5"/>`;
+    h += `<text class="pwarnt" x="${cx}" y="${ty + hh * 0.43}">Your connection isn’t private</text>`;
+    for (let k = 0; k < 2; k++) h += `<rect class="pblock" x="${ix + iw * 0.12}" y="${ty + hh * 0.52 + k * 12}" width="${iw * (k ? 0.56 : 0.76)}" height="5" rx="2"/>`;
+    h += `<rect class="pbtn" x="${cx - iw * 0.2}" y="${ty + hh * 0.52 + 30}" width="${iw * 0.4}" height="${Math.max(18, hh * 0.1)}" rx="4"/>`;
+    h += `<text class="pstage" x="${x + w / 2}" y="${y + hh + 26}">The browser refuses to load the page</text>`;
+    return h + '</g>';
+  }
   if (stage >= 1) {
     const hb = hh * 0.16, picW = iw * 0.38, picH = hh * 0.34, rowY = top + hb + 12;
     h += `<rect class="${styled ? 'phead' : 'pblock'}" x="${ix}" y="${top}" width="${iw}" height="${hb}" rx="3"/>`;
@@ -175,6 +197,61 @@ function browserPage(g, at, stage) {
   return h + '</g>';
 }
 
+/* ---------- chain of trust (step field `chain`) ----------
+   chain: {at: actor that checks, cards: [{name, checks: [[text, ok = true, who]]}], check: card index | 'all'}
+   cards run from the site's certificate (0) up to the root. Cards below `check` show as already passed. */
+function chainRange(c) {
+  const from = c.check === 'all' ? 0 : c.check, to = c.check === 'all' ? c.cards.length - 1 : c.check;
+  const list = [];
+  for (let k = from; k <= to; k++) c.cards[k].checks.forEach((_, j) => list.push([k, j]));
+  return { from, to, list };
+}
+function chainState(c, pos) {
+  const { from, to, list } = chainRange(c), shown = list.slice(0, pos);
+  const revealed = (k) => (k < from ? c.cards[k].checks.length : shown.filter(([kk]) => kk === k).length);
+  const failedAt = shown.findIndex(([k, j]) => c.cards[k].checks[j][1] === false);
+  const last = shown.at(-1), who = last ? c.cards[last[0]].checks[last[1]][2] : null;
+  const passed = (k) => revealed(k) === c.cards[k].checks.length && !c.cards[k].checks.slice(0, revealed(k)).some((x) => x[1] === false);
+  const complete = pos >= list.length;
+  return { from, to, revealed, passed, failed: failedAt >= 0, who, complete, trusted: complete && failedAt < 0 && to === c.cards.length - 1 };
+}
+function chainPanel(g, c, s) {
+  const n = c.cards.length, w = g.small ? g.W - 24 : Math.min(360, g.W * 0.5), x = g.small ? 12 : 16;
+  const row = g.small ? 20 : 23, gap = g.small ? 24 : 30, head = g.small ? 30 : 34, cardH = (k) => head + c.cards[k].checks.length * row + 6;
+  let y = 14, h = '<g class="chain">';
+  const tops = [];
+  for (let k = n - 1; k >= 0; k--) { tops[k] = y; y += cardH(k) + gap; }
+  for (let k = n - 1; k >= 0; k--) {
+    const top = tops[k], card = c.cards[k], rev = s.revealed(k), inRange = k >= s.from && k <= s.to;
+    const bad = card.checks.slice(0, rev).some((x) => x[1] === false), ok = s.passed(k);
+    const current = inRange && !s.complete && rev < card.checks.length && (k === s.from || s.passed(k - 1));
+    h += `<rect class="ccard${ok ? ' ok' : ''}${bad ? ' bad' : ''}${current ? ' cur' : ''}" x="${x}" y="${top}" width="${w}" height="${cardH(k)}" rx="8"/>`;
+    h += `<g class="ico cico" transform="translate(${x + 10},${top + 7}) scale(.8)">${ICONS.seal}</g>`;
+    h += `<text class="cname" x="${x + 36}" y="${top + 22}">${esc(card.name)}</text>`;
+    card.checks.forEach(([text, good = true], j) => {
+      const cy = top + head + j * row + 12, shownNow = j < rev;
+      if (shownNow && good) h += `<g class="ctick" transform="translate(${x + 20},${cy - 4})"><circle r="8"/><path d="M-3.5 0l2.5 2.6 4.6-5"/></g>`;
+      else if (shownNow) h += `<g class="ccross" transform="translate(${x + 20},${cy - 4})"><circle r="8"/><path d="M-3 -3l6 6M3 -3l-6 6"/></g>`;
+      else h += `<circle class="cpend" cx="${x + 20}" cy="${cy - 4}" r="7"/>`;
+      h += `<text class="ctext${shownNow ? (good ? '' : ' no') : ' wait'}" x="${x + 36}" y="${cy}">${esc(text)}</text>`;
+    });
+    if (k < n - 1) {
+      // the link between this card and the one above: solid once this card passes, broken if it failed
+      const ly = top - gap + (g.small ? -3 : 0), cx = x + 34, state = ok ? 'ok' : bad ? 'bad' : 'wait';
+      h += `<g class="clink ${state}"><rect x="${cx - 6}" y="${ly + 2}" width="12" height="16" rx="6"/><rect x="${cx - 6}" y="${ly + 12}" width="12" height="16" rx="6"/></g>`;
+    }
+  }
+  const foot = y - gap + 22;
+  if (s.trusted) h += `<g class="cverdict ok"><text x="${x + 6}" y="${foot}">✓ Every link holds: trusted</text></g>`;
+  else if (s.failed && s.complete) h += `<g class="cverdict bad"><text x="${x + 6}" y="${foot}">✗ The chain is broken: not trusted</text></g>`;
+  h += '</g>';
+  // padlock on the checking actor once the whole chain is trusted
+  const at = g.P[c.at];
+  if (at && !g.small && s.trusted) h += `<g class="lockb" transform="translate(${at.x + g.r * 0.8},${at.y - g.r * 0.8})"><circle r="12"/><rect x="-4.5" y="-1" width="9" height="7" rx="1.2"/><path d="M-2.6 -1v-2.2a2.6 2.6 0 0 1 5.2 0V-1"/></g>`;
+  if (at && !g.small && s.failed && s.complete) h += `<g class="lockb bad" transform="translate(${at.x + g.r * 0.8},${at.y - g.r * 0.8})"><circle r="12"/><path d="M-4 -4l8 8M4 -4l-8 8"/></g>`;
+  return h;
+}
+
 /* ---------- step animation ---------- */
 function fly(i, tok) {
   return new Promise((res) => {
@@ -192,9 +269,9 @@ function fly(i, tok) {
 }
 async function run(i, instant) {
   const tok = ++token;
-  step = i; done = 0; pkt = null; pageStage = 0;
-  const st = cur.steps[i], ms = st.m || [];
-  if (instant || RM.matches) { done = ms.length; pageStage = 4; draw(); return; }
+  step = i; done = 0; pkt = null; pageStage = 0; chainPos = 0;
+  const st = cur.steps[i], ms = st.m || [], chainLen = st.chain ? chainRange(st.chain).list.length : 0;
+  if (instant || RM.matches) { done = ms.length; pageStage = 4; chainPos = chainLen; draw(); return; }
   draw();
   await wait(200);
   for (let k = 0; k < ms.length; k++) {
@@ -204,7 +281,16 @@ async function run(i, instant) {
     pkt = null; done = k + 1; draw();
     await wait(300);
   }
-  if (st.page) {
+  for (let k = 1; k <= chainLen; k++) {
+    await wait(k === 1 ? 500 : 950);
+    if (tok !== token) return;
+    chainPos = k; draw();
+  }
+  if (st.page && st.warn) {
+    await wait(1200);
+    if (tok !== token) return;
+    pageStage = 4; draw();
+  } else if (st.page) {
     for (let k = 1; k <= 4; k++) {
       await wait(k === 1 ? 500 : 1300);
       if (tok !== token) return;
@@ -225,7 +311,11 @@ function activate(i, instant) {
   if (!cur.steps) return;
   const n = cur.steps.length;
   if (i < 0) { token++; step = -1; done = 0; pkt = null; draw(); }
-  else if (i >= n) { token++; step = n - 1; done = (cur.steps[n - 1].m || []).length; pageStage = 4; pkt = null; draw(); }
+  else if (i >= n) {
+    token++; step = n - 1; done = (cur.steps[n - 1].m || []).length; pageStage = 4; pkt = null;
+    chainPos = cur.steps[n - 1].chain ? chainRange(cur.steps[n - 1].chain).list.length : 0;
+    draw();
+  }
   else run(i, instant);
 }
 
